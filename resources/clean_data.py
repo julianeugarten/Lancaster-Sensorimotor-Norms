@@ -74,4 +74,19 @@ meta.head()
 # %%
 # save cleaned metadata with texts
 meta.to_csv('../data/fanfics_metadata_with_texts.csv', index=False)
+
+# %%
+
+meta.to_json(
+    '../data/fanfics_metadata_with_texts.jsonl',
+    orient='records',
+    lines=True,
+    force_ascii=False
+)
+# %%
+meta.to_json(
+    '../data/fanfics_metadata_with_texts.json',
+    orient='records',
+    force_ascii=False
+)
 # %%
