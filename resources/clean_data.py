@@ -72,18 +72,7 @@ meta['lemmatized_text'] = lemmatized
 meta.head()
 
 # %%
-# save cleaned metadata with texts
-meta.to_csv('../data/fanfics_metadata_with_texts.csv', index=False)
-
-# %%
-
-meta.to_json(
-    '../data/fanfics_metadata_with_texts.jsonl',
-    orient='records',
-    lines=True,
-    force_ascii=False
-)
-# %%
+# save the cleaned metadata with texts and lemmatizations
 meta.to_json(
     '../data/fanfics_metadata_with_texts.json',
     orient='records',
