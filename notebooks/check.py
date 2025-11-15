@@ -21,3 +21,32 @@ plt.title('Correlation Heatmap between Sensorimotor Scores and Engagement Metric
 plt.show()
 
 # %%
+df.columns
+# %%
+# okay, i think what we want are ratios over a book for all senses
+sense_cols = [
+    "auditory.mean", "gustatory.mean", "olfactory.mean",
+    "haptic.mean", "visual.mean", "interoceptive.mean"
+]
+
+use_what = "normalized_"
+
+sense_cols_prefixed = [use_what + col for col in sense_cols]
+
+# make a sense-ratio column where all senses sum to 1
+df['sense_total'] = df[sense_cols_prefixed].sum(axis=1)
+
+for sense in sense_cols_prefixed:
+    colname = sense.replace('.mean', '_percent')
+    df[f"{colname}"] = df[sense] / df['sense_total']
+df.head()
+
+# %%
+# now heatmap of correlations again
+corr_cols = [col for col in df.columns if col.endswith('_percent')] + ['comments', 'kudos', 'hits', 'kudos_hits_ratio']
+plt.figure(figsize=(10, 8))
+corr = df[corr_cols].corr()
+sns.heatmap(corr, annot=True, fmt=".2f", cmap='coolwarm', cbar=False, square=True)
+plt.title('Correlation Heatmap between Sense Ratios and Engagement Metrics')
+plt.show()
+# %%
