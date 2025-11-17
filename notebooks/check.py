@@ -2,51 +2,112 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
+import statsmodels.api as sm
+from scipy.stats import entropy
+
 
 # %%
 df = pd.read_json("../data/fanfics_metadata_with_sensorimotor_scores.json", orient='records', lines=True)
 df.head()
-# %%
-df.columns
-# %%
-col_normalized = [col for col in df.columns if col.startswith('total_')]
 
-df['kudos_hits_ratio'] = df['kudos'] / df['hits'].replace(0, 1)  # avoid division by zero
-corr_cols = col_normalized + ['comments', 'kudos', 'hits', 'kudos_hits_ratio']
+# %%
+# decide which columns to use, here senses + normalized & engagement metrics
+sense_cols = ["auditory.mean", "gustatory.mean", "olfactory.mean", "haptic.mean", "visual.mean", "interoceptive.mean"]
+use_what = "normalized_" # set this to total, avg_matched, or normalized
+
+sense_cols_prefixed = [use_what + col for col in sense_cols]
+
+# make a sense-ratio column where all senses sum to 1
+df[f'{use_what}_sense_intensity'] = df[sense_cols_prefixed].sum(axis=1)
+# and an overall sum
+total_cols = [col for col in df.columns if col.startswith("total_")]
+df['sense_overall_sum'] = df[total_cols].mean(axis=1)
+# and we add, for each sense, how big a percent of the total sense intensity it is
+for sense in sense_cols_prefixed:
+    colname = sense.replace('.mean', '_percent')
+    df[f"{colname}"] = df[sense] / df['sense_overall_sum']
+
+# and add entropy
+def prob(values):
+    total = np.sum(values)
+    return values / total if total != 0 else np.ones_like(values) / len(values)
+def calculate_entropy(embedding):
+    return entropy(prob(embedding))
+
+df['sense_entropy'] = df[sense_cols_prefixed].apply(calculate_entropy, axis=1)
+df.head()
+
+add_sense_cols = [col for col in df.columns if col.endswith('_percent')] + [f'{use_what}_sense_intensity', 'sense_overall_sum', 'sense_entropy']
+# %%
+# fix some cols
+df['published'] = pd.to_datetime(df['published'], errors='coerce')
+# add time since published column
+reference_date = pd.to_datetime("2023-01-01")
+diff = reference_date - df['published']
+df['months_since_published'] = (diff.dt.days / 30.44).astype(int)    # average month length
+
+# reception metrics
+# we use ratios since "hits", for example, are very sensitive to time on the platform.
+# ratios are not subject to drift in the same way. It’s a conversion rate: how many of the people who saw this actually cared.
+df['kudos_hits_ratio'] = df['kudos'] / df['hits'] # avoid division by zero
+df['comment_hits_ratio'] = df['comments'] / df['hits']
+# still, we do see that they are related to time on platform, so we can try to regress out time. Essentially, we want a kudo-ratio without the age-effect.
+# age-effect might haver to do with visibility on the platform, or with changing user behavior over time; random stuff like it's not on the top page anymore, etc.
+# lets ask: Across the entire dataset, how does kudos/hits typically drift as a function of months since publication?
+# we draw that curve (simple linear model) and then take the residuals as our "age-corrected" measure of engagement.
+# essentially, we get a number that tells us: given how old this fic is, is it doing better or worse than expected? did it perform above or below the age-norm?
+# most fics will be close to zero, some will be strongly positive (doing better than expected) or negative (doing worse than expected).
+# simple linear regression to get residuals
+# for kudos
+x = sm.add_constant(df['months_since_published']) # adding constant so we know we have a baseline
+y = df['kudos_hits_ratio']
+model = sm.OLS(y, x, missing='drop').fit()
+df['kudos_ratio_resid'] = model.resid
+# same for comments
+x = sm.add_constant(df['months_since_published'])
+y = df['comment_hits_ratio']
+model_comments = sm.OLS(y, x, missing='drop').fit()
+df['comment_ratio_resid'] = model_comments.resid
+
+# add the maturity rating as a numeric code
+rating_map = {
+    'General Audiences': 0,
+    'Teen And Up Audiences': 1,
+    'Mature': 2,
+    'Explicit': 3,
+    'Not Rated': np.nan} # so higher number means more mature content
+df['rating_code'] = df['rating'].map(rating_map)
+
+# formalize the columns we want to look at
+engagement_cols = ['kudos_hits_ratio', 'comment_hits_ratio', 'kudos_ratio_resid', 'comment_ratio_resid', 'rating_code', 'months_since_published']
+
+corr_cols = sense_cols_prefixed + add_sense_cols + engagement_cols
 # heatmap of correlations
-plt.figure(figsize=(10, 8))
+plt.figure(figsize=(15, 10))
 corr = df[corr_cols].corr()
 sns.heatmap(corr, annot=True, fmt=".2f", cmap='coolwarm', cbar=False, square=True)
 plt.title('Correlation Heatmap between Sensorimotor Scores and Engagement Metrics')
 plt.show()
 
 # %%
-df.columns
-# %%
-# okay, i think what we want are ratios over a book for all senses
-sense_cols = [
-    "auditory.mean", "gustatory.mean", "olfactory.mean",
-    "haptic.mean", "visual.mean", "interoceptive.mean"
-]
 
-use_what = "normalized_"
+# plot the relationship between months since published and kudos_hits_ratio with regression line
+plt.figure(figsize=(8, 6))
+sns.scatterplot(x='months_since_published', y='kudos_hits_ratio', data=df, alpha=0.5)
+sns.lineplot(x='months_since_published', y=model.fittedvalues, color='red', data=df)
+plt.title('Kudos-Hits Ratio vs. Months Since Published with Regression Line')
+plt.xlabel('Months Since Published')
+plt.ylabel('Kudos-Hits Ratio')
+plt.show()
 
-sense_cols_prefixed = [use_what + col for col in sense_cols]
-
-# make a sense-ratio column where all senses sum to 1
-df['sense_total'] = df[sense_cols_prefixed].sum(axis=1)
-
-for sense in sense_cols_prefixed:
-    colname = sense.replace('.mean', '_percent')
-    df[f"{colname}"] = df[sense] / df['sense_total']
-df.head()
-
-# %%
-# now heatmap of correlations again
-corr_cols = [col for col in df.columns if col.endswith('_percent')] + ['comments', 'kudos', 'hits', 'kudos_hits_ratio']
-plt.figure(figsize=(10, 8))
-corr = df[corr_cols].corr()
-sns.heatmap(corr, annot=True, fmt=".2f", cmap='coolwarm', cbar=False, square=True)
-plt.title('Correlation Heatmap between Sense Ratios and Engagement Metrics')
+# make historgrams of the residuals
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+sns.histplot(df['kudos_ratio_resid'].dropna(), kde=True)
+plt.title('Histogram of Kudos-Hits Ratio Residuals')
+plt.subplot(1, 2, 2)
+sns.histplot(df['comment_ratio_resid'].dropna(), kde=True)
+plt.title('Histogram of Comment-Hits Ratio Residuals')
 plt.show()
 # %%
