@@ -53,13 +53,13 @@ df['published'] = pd.to_datetime(df['published'], errors='coerce')
 # add time since published column
 reference_date = pd.to_datetime("2023-01-01")
 diff = reference_date - df['published']
-df['months_since_published'] = (diff.dt.days / 30.44).astype(int)    # average month length
+df['days_since_published'] = diff.dt.days
 
 # reception metrics
 # we use ratios since "hits", for example, are very sensitive to time on the platform.
 # ratios are not subject to drift in the same way. It’s a conversion rate: how many of the people who saw this actually cared.
-df['kudos_hits_ratio'] = df['kudos'] / df['hits'] # avoid division by zero
-df['comment_hits_ratio'] = df['comments'] / df['hits']
+df['kudos_hits_ratio'] = df['kudos'] / df['hits'].replace(0, np.nan) # avoid division by zero
+df['comment_hits_ratio'] = df['comments'] / df['hits'].replace(0, np.nan)
 # still, we do see that they are related to time on platform, so we can try to regress out time. Essentially, we want a kudo-ratio without the age-effect.
 # age-effect might haver to do with visibility on the platform, or with changing user behavior over time; random stuff like it's not on the top page anymore, etc.
 # lets ask: Across the entire dataset, how does kudos/hits typically drift as a function of months since publication?
@@ -68,12 +68,12 @@ df['comment_hits_ratio'] = df['comments'] / df['hits']
 # most fics will be close to zero, some will be strongly positive (doing better than expected) or negative (doing worse than expected).
 # simple linear regression to get residuals
 # for kudos
-x = sm.add_constant(df['months_since_published']) # adding constant so we know we have a baseline
+x = sm.add_constant(df['days_since_published']) # adding constant so we know we have a baseline
 y = df['kudos_hits_ratio']
 model = sm.OLS(y, x, missing='drop').fit()
 df['kudos_ratio_resid'] = model.resid
 # same for comments
-x = sm.add_constant(df['months_since_published'])
+x = sm.add_constant(df['days_since_published'])
 y = df['comment_hits_ratio']
 model_comments = sm.OLS(y, x, missing='drop').fit()
 df['comment_ratio_resid'] = model_comments.resid
@@ -88,7 +88,7 @@ rating_map = {
 df['rating_code'] = df['rating'].map(rating_map)
 
 # formalize the columns we want to look at
-engagement_cols = ['kudos_hits_ratio', 'comment_hits_ratio', 'kudos_ratio_resid', 'comment_ratio_resid', 'rating_code', 'months_since_published']
+engagement_cols = ['kudos_hits_ratio', 'comment_hits_ratio', 'kudos_ratio_resid', 'comment_ratio_resid', 'rating_code', 'days_since_published']
 
 corr_cols = sense_cols_prefixed + add_sense_cols + engagement_cols
 # heatmap of correlations
@@ -103,19 +103,19 @@ plt.show()
 
 # plot the relationship between months since published and kudos_hits_ratio with regression line
 plt.figure(figsize=(8, 6))
-sns.scatterplot(x='months_since_published', y='kudos_hits_ratio', data=df, alpha=0.5)
-sns.lineplot(x='months_since_published', y=model.fittedvalues, color='red', data=df)
-plt.title('Kudos-Hits Ratio vs. Months Since Published with Regression Line')
-plt.xlabel('Months Since Published')
+sns.scatterplot(x='days_since_published', y='kudos_hits_ratio', data=df, alpha=0.5)
+sns.lineplot(x='days_since_published', y=model.fittedvalues, color='red', data=df)
+plt.title('Kudos-Hits Ratio vs. Days Since Published with Regression Line')
+plt.xlabel('Days Since Published')
 plt.ylabel('Kudos-Hits Ratio')
 plt.show()
 
 # lets see the comment_hits_ratio vs months since published
 plt.figure(figsize=(8, 6))
-sns.scatterplot(x='months_since_published', y='comment_hits_ratio', data=df, alpha=0.5)
-sns.lineplot(x='months_since_published', y=model_comments.fittedvalues, color='red', data=df)
-plt.title('Comment-Hits Ratio vs. Months Since Published with Regression Line')
-plt.xlabel('Months Since Published')
+sns.scatterplot(x='days_since_published', y='comment_hits_ratio', data=df, alpha=0.5)
+sns.lineplot(x='days_since_published', y=model_comments.fittedvalues, color='red', data=df)
+plt.title('Comment-Hits Ratio vs. Days Since Published with Regression Line')
+plt.xlabel('Days Since Published')
 plt.ylabel('Comment-Hits Ratio')
 plt.show()
 
