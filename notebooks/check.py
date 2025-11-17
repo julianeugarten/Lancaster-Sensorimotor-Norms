@@ -9,36 +9,44 @@ from scipy.stats import entropy
 
 # %%
 df = pd.read_json("../data/fanfics_metadata_with_sensorimotor_scores.json", orient='records', lines=True)
+
+drop_cols = ['total_foot_leg.mean','normalized_foot_leg.mean', 'avg_matched_foot_leg.mean','total_hand_arm.mean', 'normalized_hand_arm.mean',
+       'avg_matched_hand_arm.mean', 'total_head.mean', 'normalized_head.mean','avg_matched_head.mean', 'total_mouth.mean', 'normalized_mouth.mean',
+       'avg_matched_mouth.mean', 'total_torso.mean', 'normalized_torso.mean','avg_matched_torso.mean']
+df = df.drop(columns=drop_cols)
 df.head()
 
 # %%
 # decide which columns to use, here senses + normalized & engagement metrics
 sense_cols = ["auditory.mean", "gustatory.mean", "olfactory.mean", "haptic.mean", "visual.mean", "interoceptive.mean"]
 use_what = "normalized_" # set this to total, avg_matched, or normalized
-
 sense_cols_prefixed = [use_what + col for col in sense_cols]
 
 # make a sense-ratio column where all senses sum to 1
-df[f'{use_what}_sense_intensity'] = df[sense_cols_prefixed].sum(axis=1)
+df[f'{use_what}sense_sum'] = df[sense_cols_prefixed].sum(axis=1)
 # and an overall sum
 total_cols = [col for col in df.columns if col.startswith("total_")]
 df['sense_overall_sum'] = df[total_cols].mean(axis=1)
 # and we add, for each sense, how big a percent of the total sense intensity it is
 for sense in sense_cols_prefixed:
     colname = sense.replace('.mean', '_percent')
-    df[f"{colname}"] = df[sense] / df['sense_overall_sum']
+    df[f"{colname}"] = df[sense] / df[f'{use_what}sense_sum']
 
 # and add entropy
-def prob(values):
-    total = np.sum(values)
-    return values / total if total != 0 else np.ones_like(values) / len(values)
-def calculate_entropy(embedding):
-    return entropy(prob(embedding))
+def calculate_entropy(values):
+    values = np.array(values)
+    total = values.sum()
+    if total == 0:
+        # uniform distribution if all zeros
+        values = np.ones_like(values) / len(values)
+    else:
+        values = values / total
+    return entropy(values, base=2)  # optional: base=2 for bits
 
 df['sense_entropy'] = df[sense_cols_prefixed].apply(calculate_entropy, axis=1)
 df.head()
 
-add_sense_cols = [col for col in df.columns if col.endswith('_percent')] + [f'{use_what}_sense_intensity', 'sense_overall_sum', 'sense_entropy']
+add_sense_cols = [f'{use_what}sense_sum', 'sense_overall_sum', 'sense_entropy'] #+ [col for col in df.columns if col.endswith('_percent')] # percent show some of the same info so we skip them for now
 # %%
 # fix some cols
 df['published'] = pd.to_datetime(df['published'], errors='coerce')
@@ -85,9 +93,10 @@ engagement_cols = ['kudos_hits_ratio', 'comment_hits_ratio', 'kudos_ratio_resid'
 corr_cols = sense_cols_prefixed + add_sense_cols + engagement_cols
 # heatmap of correlations
 plt.figure(figsize=(15, 10))
-corr = df[corr_cols].corr()
+corr = df[corr_cols].corr(method='spearman')
 sns.heatmap(corr, annot=True, fmt=".2f", cmap='coolwarm', cbar=False, square=True)
 plt.title('Correlation Heatmap between Sensorimotor Scores and Engagement Metrics')
+plt.savefig("../figs/correlation_heatmap.png", bbox_inches='tight')
 plt.show()
 
 # %%
@@ -99,6 +108,15 @@ sns.lineplot(x='months_since_published', y=model.fittedvalues, color='red', data
 plt.title('Kudos-Hits Ratio vs. Months Since Published with Regression Line')
 plt.xlabel('Months Since Published')
 plt.ylabel('Kudos-Hits Ratio')
+plt.show()
+
+# lets see the comment_hits_ratio vs months since published
+plt.figure(figsize=(8, 6))
+sns.scatterplot(x='months_since_published', y='comment_hits_ratio', data=df, alpha=0.5)
+sns.lineplot(x='months_since_published', y=model_comments.fittedvalues, color='red', data=df)
+plt.title('Comment-Hits Ratio vs. Months Since Published with Regression Line')
+plt.xlabel('Months Since Published')
+plt.ylabel('Comment-Hits Ratio')
 plt.show()
 
 # make historgrams of the residuals
