@@ -12,27 +12,10 @@ For each modality (auditory, gustatory, haptic, interoceptive, olfactory, visual
 | `normalized_` | Total score divided by the **number of words in the text**. Accounts for text length. |
 | `avg_matched_` | Total score divided by **number of words matched in the lexicon**. Reflects average intensity for words with sensorimotor values, independent of text length. |
 
-## Modalities
-
-| Modality | Description |
-|----------|-------------|
-| `auditory.mean` | Auditory-related sensations. |
-| `gustatory.mean` | Taste-related sensations. |
-| `haptic.mean` | Touch/texture-related sensations. |
-| `interoceptive.mean` | Internal bodily sensations (hunger, heartbeat, etc.). |
-| `olfactory.mean` | Smell-related sensations. |
-| `visual.mean` | Vision-related sensations. |
-| `foot_leg.mean` | Foot and leg body-part references. |
-| `hand_arm.mean` | Hand and arm body-part references. |
-| `head.mean` | Head-related body-part references. |
-| `mouth.mean` | Mouth-related body-part references. |
-| `torso.mean` | Torso-related body-part references. |
-
 ## Notes
 
 - Scores are calculated per fanfic using **lemmatized tokens** to match lexicon entries.  
 - `normalized_` adjusts for text length; `avg_matched_` adjusts for lexicon coverage.  
-- These scores can be used for studying sensorimotor imagery and embodiment in fanfic texts.
 
 
 # Sensitive Content Columns
