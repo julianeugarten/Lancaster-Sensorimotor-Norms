@@ -92,6 +92,7 @@ for label in labels:
     df[f'sensitive_{label}'] = dict_preds[label]
 df.head()
 
+# %%
 # save as JSON version
 df.to_json(f"../data/{ts}_fanfics_sensitivity_labelled.json", orient='records', lines=True)
 df.head()
