@@ -14,6 +14,12 @@ drop_cols = ['total_foot_leg.mean','normalized_foot_leg.mean', 'avg_matched_foot
        'avg_matched_hand_arm.mean', 'total_head.mean', 'normalized_head.mean','avg_matched_head.mean', 'total_mouth.mean', 'normalized_mouth.mean',
        'avg_matched_mouth.mean', 'total_torso.mean', 'normalized_torso.mean','avg_matched_torso.mean']
 df = df.drop(columns=drop_cols)
+
+# add the sensitivity columns
+sensitivity_df = pd.read_json("../data/2025-11-17_14-11_fanfics_sensitivity_labelled.json", orient='records', lines=True)
+sensitivity_labels = [x for x in sensitivity_df.columns if x.startswith('sensitive_')] + ["work_id"] # just get the important columns
+sensitivity_df = sensitivity_df[sensitivity_labels]
+df = df.merge(sensitivity_df, how='left', on='work_id')
 df.head()
 
 # %%
