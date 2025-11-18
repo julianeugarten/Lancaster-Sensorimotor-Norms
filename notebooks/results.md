@@ -18,3 +18,6 @@ This can also be seen in its strong negative correlation with sense_entropy (-0.
 
 We could look more into this
 
+# okay
+so right now it looks like engagement metrics go down with explicit content, maturity rating, and some senses (haptic mainly). But this might just point to that we see a different form of engagement that is not captured by the engagement ratios.
+We'd want to know if they are also negatively associated with raw hits/kudos (log-transformed). If so, then it would point to that these stories just get less engagement overall, not just in terms of ratios (in terms of an engagement form).
