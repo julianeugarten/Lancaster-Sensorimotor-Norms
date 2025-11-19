@@ -4,8 +4,13 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import shapiro
+import numpy as np
 import statsmodels.api as sm
+import time
 
+# timestamp
+ts = time.strftime("%Y-%m-%d")
+print("Timestamp:", ts)
 # %%
 df = pd.read_json("../data/fanfics_metadata_with_sensorimotor_scores.json", orient='records', lines=True)
 
@@ -20,6 +25,21 @@ sensitivity_labels = [x for x in sensitivity_df.columns if x.startswith('sensiti
 sensitivity_df = sensitivity_df[sensitivity_labels]
 df = df.merge(sensitivity_df, how='left', on='work_id')
 df.head()
+
+# %%
+
+# OBS dropping rows
+
+print("Original length of dataframe:", len(df))
+# drop rows with missing sensorimotor scores
+sense_cols = [f'normalized_{sense}.mean' for sense in ['auditory', 'gustatory', 'olfactory', 'haptic', 'visual', 'interoceptive']]
+engagement_cols = ['kudos', 'comments', 'hits', 'days_since_published']
+
+# drop rows with value == 0 in any sense cols
+for col in sense_cols:
+    df = df[df[col] != 0]
+print("Length after dropping rows with no sensorimotor scores:", len(df))
+
 # %%
 
 # fix some cols
@@ -37,27 +57,6 @@ for col in reception_cols:
     # fillna with 0
     df[col] = df[col].fillna(0)
 
-# %%
-
-# we want to look at distributions
-sense_cols = [f'normalized_{sense}.mean' for sense in ['auditory', 'gustatory', 'olfactory', 'haptic', 'visual', 'interoceptive']]
-engagement_cols = ['kudos', 'comments', 'hits', 'days_since_published']
-
-tmp = df.sample(n=4000, random_state=42) # sample for speed
-
-for col in sense_cols + engagement_cols:
-    print(f"Shapiro-Wilk test for {col}:")
-    data = tmp[col].dropna()
-    stat, p = shapiro(data)
-    print(f"  Statistic={stat:.4f}, p-value={p:.4f}")
-    plt.figure(figsize=(8, 4))
-    sns.set_style("whitegrid")
-    sns.histplot(df[col].dropna(), kde=True)
-    plt.title(f'Distribution of {col}')
-    plt.xlabel(col)
-    plt.ylabel('Frequency')
-    plt.show()
-
 
 # %%
 
@@ -65,8 +64,8 @@ for col in sense_cols + engagement_cols:
 
 # we use ratios since "hits", for example, are very sensitive to time on the platform.
 # ratios are not subject to drift in the same way. It’s a conversion rate: how many of the people who saw this actually cared.
-df['kudos_hits_ratio'] = df['kudos'] / df['hits'].replace(0, 1) # avoid division by zero
-df['comment_hits_ratio'] = df['comments'] / df['hits'].replace(0, 1)
+df['kudos_hits_ratio'] = df['kudos'] / df['hits']#.replace(0, 1) # avoid division by zero
+df['comment_hits_ratio'] = df['comments'] / df['hits']#.replace(0, 1)
 # still, we do see that they are related to time on platform, so we can try to regress out time. Essentially, we want a kudo-ratio without the age-effect.
 # age-effect might haver to do with visibility on the platform, or with changing user behavior over time; random stuff like it's not on the top page anymore, etc.
 # lets ask: Across the entire dataset, how does kudos/hits typically drift as a function of months since publication?
@@ -75,28 +74,125 @@ df['comment_hits_ratio'] = df['comments'] / df['hits'].replace(0, 1)
 # most fics will be close to zero, some will be strongly positive (doing better than expected) or negative (doing worse than expected).
 # simple linear regression to get residuals
 # for kudos
-# x = sm.add_constant(df['days_since_published']) # adding constant so we know we have a baseline
-# y = df['kudos_hits_ratio']
-# model = sm.OLS(y, x).fit()
-# df['kudos_ratio_resid'] = model.resid
-# # same for comments
-# x = sm.add_constant(df['days_since_published'])
-# y = df['comment_hits_ratio']
-# model_comments = sm.OLS(y, x).fit()
-# df['comment_ratio_resid'] = model_comments.resid
 
-# linear regression on non-NaN rows
-valid_kudos = df['kudos_hits_ratio'].notna()
-x = sm.add_constant(df.loc[valid_kudos, 'days_since_published'])
-y = df.loc[valid_kudos, 'kudos_hits_ratio']
-model = sm.OLS(y, x).fit()
-df.loc[valid_kudos, 'kudos_ratio_resid'] = model.resid
+# print na in engagement cols
+print("Number of NaNs in engagement ratios before regression:", df['kudos_hits_ratio'].isna().sum(), df['comment_hits_ratio'].isna().sum())
 
-valid_comments = df['comment_hits_ratio'].notna()
-x = sm.add_constant(df.loc[valid_comments, 'days_since_published'])
-y = df.loc[valid_comments, 'comment_hits_ratio']
-model_comments = sm.OLS(y, x).fit()
-df.loc[valid_comments, 'comment_ratio_resid'] = model_comments.resid
+# we want to look at distributions
+tmp = df.sample(n=4000, random_state=42) # sample for speed
+
+# subplot setup
+fig, axes = plt.subplots(3, 2, figsize=(15, 9))
+axes = axes.flatten()
+for i, sense in enumerate(sense_cols):
+    # shapiro
+    stat, p = shapiro(tmp[sense].dropna())
+    print(f'Shapiro-Wilk test for {sense}: stat={stat:.4f}, p={p:.4f}')
+    ax = axes[i]
+    sns.histplot(df[sense], kde=True, ax=ax)
+plt.tight_layout()
+plt.savefig(f"../figs/distributions/{ts}_sensorimotor_distributions.png")
+plt.show()
+
+fig, axes = plt.subplots(3, 2, figsize=(15, 9))
+axes = axes.flatten()
+for i, col in enumerate(engagement_cols + ['kudos_hits_ratio', 'comment_hits_ratio']):
+    # shapiro
+    stat, p = shapiro(tmp[col].dropna())
+    print(f'Shapiro-Wilk test for {col}: stat={stat:.4f}, p={p:.4f}')
+    ax = axes[i]
+    sns.histplot(df[col], kde=True, ax=ax)
+plt.tight_layout()
+plt.savefig(f"../figs/distributions/{ts}_engagement_distributions.png")
+plt.show()
+
+# alright, very long tails for the engagement metrics
+# also ratios are quite skewed
+# we should log-transform them before regression
+
+# %%
+
+df['log_age'] = np.log(df['days_since_published'].replace(0, 1))
+X_log = sm.add_constant(df['log_age'])
+#X = sm.add_constant(df['days_since_published'])
+
+engagement_cols = ['kudos_hits_ratio', 'comment_hits_ratio', 'hits', 'kudos', 'comments']
+
+for col in engagement_cols:
+    y = df[col]
+    y_log = np.log(y.replace(0, 1)) # avoid log(0)
+    print(f"\nProcessing OLS for {col}...")
+    print(f"OLS summary for {col}:")
+    model = sm.OLS(y_log, X_log, missing='drop').fit()
+    # model summary
+    print(model.summary())
+    df[f'{col}_resid'] = model.resid
+    # add spearman correlation of residuals with days_since_published
+    print("\n")
+    print(f"spearman of residuals {col} with days_since_published:")
+    corr = df[[f'{col}_resid', 'days_since_published']].dropna().corr(method='spearman').iloc[0,1]
+    print(f"{corr:.4f}")
+
+    # and lets plot the regression
+    plt.figure(figsize=(8, 6))
+    sns.scatterplot(x='days_since_published', y=y_log, data=df, alpha=0.5)
+    sns.lineplot(x='days_since_published', y=model.fittedvalues, color='red', data=df)
+    plt.title(f'Log-Transformed {col} vs. Days Since Published with Regression Line')
+    plt.xlabel('Days Since Published')
+    plt.ylabel(f'Log-Transformed {col}')
+    plt.show()
+
+df.head()
+# %%
+# check nan in author
+print("Number of NaNs in author column:", df['author'].isna().sum())
+# unlist authorname ['X'] -> 'X'
+df['author'] = df['author'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x)
+
+# %%
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+import numpy as np
+import pandas as pd
+
+df['author'] = df['author'].astype('category')
+
+
+# Mixed-effects model to regress out age effect with random intercept for author
+for col in engagement_cols:
+    # Log-transform all metrics
+    df[f'log_{col}'] = np.log(df[col].replace(0, 1)).astype(float)
+    
+    # Drop rows with missing values in dependent, predictor, or group
+    model_df = df[['author', f'log_{col}', 'log_age', 'days_since_published']].dropna()
+    
+    print(f"\nProcessing MixedLM for {col} (log-transformed)...")
+    
+    formula = f'log_{col} ~ log_age'
+    
+    md = smf.mixedlm(formula, model_df, groups=model_df["author"])
+    mdf = md.fit(reml=False)
+    
+    print(mdf.summary())
+    
+    # Store residuals
+    model_df[f'{col}_resid'] = mdf.resid
+    
+    # Check residual correlation with days_since_published
+    corr = model_df[[f'{col}_resid', 'days_since_published']].corr(method='spearman').iloc[0,1]
+    print(f"Spearman correlation of residuals with days_since_published: {corr:.4f}")
+
+    # Plot regression results
+    plt.figure(figsize=(8, 6))
+    sns.scatterplot(x='days_since_published', y=df[f'log_{col}'], data=df, alpha=0.5)
+    sns.lineplot(x='days_since_published', y=mdf.fittedvalues, color='red', data=df)
+    plt.title(f'Log {col} vs. Days with MixedLM Regression Line')
+
+
+
+# %%
+
+# finally
 
 # add the maturity rating as a numeric code
 rating_map = {
