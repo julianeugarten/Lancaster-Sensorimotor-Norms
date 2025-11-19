@@ -29,6 +29,9 @@ Positive correlations among labels like sex, drugs, selfharm, profanity (~0.19â€
 not-sensitive is negatively correlated with all sensitive labels (-0.55 to -0.70), which is logical, this column indicates absence of sensitive content 0-1 (overall prediction by model).
 `sensitivity_prop_above_threshold`: 
 
+# 5. Engagement metrics
+
+
 # okay
 so right now it looks like engagement metrics go down with explicit content, maturity rating, and some senses (haptic mainly). But this might just point to that we see a different form of engagement that is not captured by the engagement ratios.
 We'd want to know if they are also negatively associated with raw hits/kudos (log-transformed). If so, then it would point to that these stories just get less engagement overall, not just in terms of ratios (in terms of an engagement form).

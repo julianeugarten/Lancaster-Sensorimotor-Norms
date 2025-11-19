@@ -1,11 +1,12 @@
 # %%
 
 import pandas as pd
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import shapiro
-import numpy as np
 import statsmodels.api as sm
+import statsmodels.formula.api as smf
 import time
 
 # timestamp
@@ -112,88 +113,92 @@ plt.show()
 
 # %%
 
-df['log_age'] = np.log(df['days_since_published'].replace(0, 1))
+##### Test with simple linear regression first #####
+
+# log transform days since published, as the distribution is highly skewed
+df['log_age'] = np.log(df['days_since_published'])
 X_log = sm.add_constant(df['log_age'])
-#X = sm.add_constant(df['days_since_published'])
 
 engagement_cols = ['kudos_hits_ratio', 'comment_hits_ratio', 'hits', 'kudos', 'comments']
 
 for col in engagement_cols:
     y = df[col]
+    # log transform y because of skewness
     y_log = np.log(y.replace(0, 1)) # avoid log(0)
     print(f"\nProcessing OLS for {col}...")
     print(f"OLS summary for {col}:")
     model = sm.OLS(y_log, X_log, missing='drop').fit()
     # model summary
     print(model.summary())
-    df[f'{col}_resid'] = model.resid
-    # add spearman correlation of residuals with days_since_published
-    print("\n")
-    print(f"spearman of residuals {col} with days_since_published:")
-    corr = df[[f'{col}_resid', 'days_since_published']].dropna().corr(method='spearman').iloc[0,1]
-    print(f"{corr:.4f}")
+    
+    # # store residuals
+    # df[f'{col}_resid'] = model.resid
 
-    # and lets plot the regression
-    plt.figure(figsize=(8, 6))
-    sns.scatterplot(x='days_since_published', y=y_log, data=df, alpha=0.5)
-    sns.lineplot(x='days_since_published', y=model.fittedvalues, color='red', data=df)
-    plt.title(f'Log-Transformed {col} vs. Days Since Published with Regression Line')
-    plt.xlabel('Days Since Published')
-    plt.ylabel(f'Log-Transformed {col}')
-    plt.show()
+    # # add spearman correlation of residuals with days_since_published
+    # print("\n")
+    # print(f"spearman of residuals {col} with days_since_published:")
+    # corr = df[[f'{col}_resid', 'days_since_published']].dropna().corr(method='spearman').iloc[0,1]
+    # print(f"{corr:.4f}")
 
-df.head()
-# %%
-# check nan in author
-print("Number of NaNs in author column:", df['author'].isna().sum())
-# unlist authorname ['X'] -> 'X'
-df['author'] = df['author'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x)
+    # # and lets plot the regression
+    # plt.figure(figsize=(8, 6))
+    # sns.scatterplot(x='days_since_published', y=y_log, data=df, alpha=0.5)
+    # sns.lineplot(x='days_since_published', y=model.fittedvalues, color='red', data=df)
+    # plt.title(f'Log-Transformed {col} vs. Days Since Published with Regression Line')
+    # plt.xlabel('Days Since Published')
+    # plt.ylabel(f'Log-Transformed {col}')
+    # plt.show()
 
 # %%
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
-import numpy as np
-import pandas as pd
 
+#### Mixed-effects model #####
+# we want to account for author-level variability, so we use a mixed-effects model with random intercepts for authors
+
+# first, make sure author is categorical
 df['author'] = df['author'].astype('category')
 
-
-# Mixed-effects model to regress out age effect with random intercept for author
+# Mixed-effects model loop
 for col in engagement_cols:
-    # Log-transform all metrics
-    df[f'log_{col}'] = np.log(df[col].replace(0, 1)).astype(float)
+    print(f"\nProcessing MixedLM for {col} (log-transformed)...")
+    model_df = df.copy()
+
+    # Log-transform col
+    #df[f'log_{col}'] = np.log(df[col] + 0.01) # add small constant to avoid log(0)
+    # we dont just want to add 1 to avoid log(0), because that would distort small values too much
+    epsilon = 0.001 * (model_df[col].max() - model_df[col].min())
+    model_df[f'log_{col}'] = np.log(model_df[col] + epsilon)
     
     # Drop rows with missing values in dependent, predictor, or group
-    model_df = df[['author', f'log_{col}', 'log_age', 'days_since_published']].dropna()
+    model_df = model_df[['author', f'log_{col}', 'log_age', 'days_since_published', 'work_id']].dropna()
     
-    print(f"\nProcessing MixedLM for {col} (log-transformed)...")
-    
+    # Define and fit the mixed-effects model
     formula = f'log_{col} ~ log_age'
-    
     md = smf.mixedlm(formula, model_df, groups=model_df["author"])
     mdf = md.fit(reml=False)
-    
     print(mdf.summary())
     
     # Store residuals
     model_df[f'{col}_resid'] = mdf.resid
+    # save workid and residuals to main df
+    df = df.merge(model_df[['work_id', f'{col}_resid']], how='left', on='work_id')
     
     # Check residual correlation with days_since_published
     corr = model_df[[f'{col}_resid', 'days_since_published']].corr(method='spearman').iloc[0,1]
-    print(f"Spearman correlation of residuals with days_since_published: {corr:.4f}")
+    print(f"Spearman correlation of residuals {col} x days: {corr:.4f}")
 
     # Plot regression results
     plt.figure(figsize=(8, 6))
-    sns.scatterplot(x='days_since_published', y=df[f'log_{col}'], data=df, alpha=0.5)
-    sns.lineplot(x='days_since_published', y=mdf.fittedvalues, color='red', data=df)
-    plt.title(f'Log {col} vs. Days with MixedLM Regression Line')
-
-
+    sns.scatterplot(x='days_since_published', y=model_df[f'log_{col}'], data=model_df, alpha=0.5)
+    # we only want to plot the fixed effects line
+    fixed_vals = mdf.fe_params['Intercept'] + mdf.fe_params['log_age'] * model_df['log_age']
+    sns.lineplot(x=model_df['days_since_published'], y=fixed_vals, color='red')
+    plt.title(f'Log {col} vs. days with MixedLM Regression Line')
+    plt.show()
 
 # %%
-
+df.head()
+# %%
 # finally
-
 # add the maturity rating as a numeric code
 rating_map = {
     'General Audiences': 0,
@@ -203,3 +208,10 @@ rating_map = {
     'Not Rated': np.nan} # so higher number means more mature content
 df['maturity_rating'] = df['rating'].map(rating_map)
 
+df.head()
+
+
+# %%
+# save to json
+df.to_json(f"../data/{ts}_fanfics_metadata_with_residuals.json", orient='records', lines=True)
+# %%

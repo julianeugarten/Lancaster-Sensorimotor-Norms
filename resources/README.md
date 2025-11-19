@@ -15,17 +15,52 @@ For each modality (auditory, gustatory, haptic, interoceptive, olfactory, visual
 | `sense_overall_sum`   | Mean of all `total_*` sensorimotor columns |
 | `x.mean_percent` | Fraction of the story’s total normalized sensorimotor intensity accounted for by sense X. For example, if `auditory.mean_percent = 0.3`, then 30% of the story’s total normalized sense intensity comes from auditory scores. |
 | `sense_entropy` | Entropy of the six normalized sense values (distributional diversity)   |
+
+
+# Engagement Metrics Columns
+
+This dataset includes several engagement metrics per fanfic, along with age-corrected residuals to account for the effect of time since publication.
+
+| Column prefix | Description |
+|---------------|-------------|
 | `days_since_published`  | Number of days since the work was published and to 2023-01-01 (arbitrary date) |
 | `kudos_hits_ratio` | Ratio of kudos to hits (raw conversion rate)      |
 | `comment_hits_ratio` | Ratio of comments to hits (raw conversion rate)  |
 | `kudos_ratio_resid` | Residual of `kudos_hits_ratio` after regressing out `days_since_published` (age-corrected)   |
 | comment_ratio_resid | Residual of `comment_hits_ratio` after regressing out `days_since_published` (age-corrected) |
 | `maturity_rating` | Numeric code for maturity rating (0=General, 1=Teen+, 2=Mature, 3=Explicit, NaN=Not Rated) |
+| `x_resid` | Columns containing residuals from the MixedLM models for each engagement metric (comments, hits, kudos, and the two ratios). These represent how each story’s engagement compares to the expected value given its age and author: positive residuals indicate higher-than-expected engagement, negative residuals indicate lower-than-expected engagement. |
 
 ## Notes
 
 - Scores are calculated per fanfic using **lemmatized tokens** to match lexicon entries.  
 - `normalized_` adjusts for text length; `avg_matched_` adjusts for lexicon coverage.  
+
+## on the residuals:
+### Engagement Metrics Age-Adjusted Analysis
+
+This project analyzes post engagement metrics (`hits`, `kudos`, `comments`) while controlling for post age and author effects. All metrics are log-transformed to reduce skew and stabilize variance.
+
+- **Mixed-effects models** (`MixedLM`) were used:  
+  - Fixed effect: `log_age` (log of days since published)  
+  - Random intercept: `author`  
+- Residuals from these models are effectively decorrelated from post age, allowing age-independent analysis of engagement patterns.
+- Ratios (`kudos_hits_ratio`, `comment_hits_ratio`) and counts (`hits`, `kudos`, `comments`) were all log-transformed before modeling.
+
+### Key Findings
+
+- `log_age` is highly significant in all models:
+  - Negative effect for ratios (`kudos_hits_ratio`, `comment_hits_ratio`)  
+  - Positive effect for counts (`hits`, `kudos`, `comments`)  
+- Author-level variance is nonzero, meaning some variation in engagement is attributable to individual authors.  
+- Spearman correlations of residuals with `days_since_published` are very small (~ -0.02 to 0.01), confirming that the age effect is effectively removed.  
+
+### Statistical Assessment
+
+- All models converged successfully.  
+- The random effects structure is justified by nonzero author-level variance.  
+- Residual diagnostics indicate that the age effect has been successfully accounted for.  
+- Low mean observations per author (~2) suggest caution interpreting author variance estimates, but overall the models are statistically solid for age-adjustment purposes.
 
 
 # Sensitive Content Columns
