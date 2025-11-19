@@ -18,6 +18,17 @@ This can also be seen in its strong negative correlation with sense_entropy (-0.
 
 We could look more into this
 
+# 3. Entropy (sense_entropy)
+High positive correlations with gustatory.mean, olfactory.mean, and interoceptive.mean (~0.71–0.87)
+Interpretation: works that spread attention across multiple senses (especially gustatory/olfactory/interoceptive) have higher entropy.
+Slight negative correlation with visual.mean (-0.14) → visual-heavy works are often less multisensory (?), so lower entropy.
+
+
+# 4. Sensitivity labels
+Positive correlations among labels like sex, drugs, selfharm, profanity (~0.19–0.75) indicate that works flagged for one kind of sensitive content often overlap with others.
+not-sensitive is negatively correlated with all sensitive labels (-0.55 to -0.70), which is logical, this column indicates absence of sensitive content 0-1 (overall prediction by model).
+`sensitivity_prop_above_threshold`: 
+
 # okay
 so right now it looks like engagement metrics go down with explicit content, maturity rating, and some senses (haptic mainly). But this might just point to that we see a different form of engagement that is not captured by the engagement ratios.
 We'd want to know if they are also negatively associated with raw hits/kudos (log-transformed). If so, then it would point to that these stories just get less engagement overall, not just in terms of ratios (in terms of an engagement form).
