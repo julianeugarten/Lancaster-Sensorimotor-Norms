@@ -10,20 +10,23 @@ ts = time.strftime("%Y-%m-%d_%H-%M")
 print(f"Timestamp: {ts}")
 
 # %%
-df = pd.read_json("../data/fanfics_metadata_with_sensorimotor_scores.json", orient='records', lines=True)
+# df = pd.read_json("../data/fanfics_metadata_with_sensorimotor_scores.json", orient='records', lines=True)
 
-drop_cols = ['total_foot_leg.mean','normalized_foot_leg.mean', 'avg_matched_foot_leg.mean','total_hand_arm.mean', 'normalized_hand_arm.mean',
-       'avg_matched_hand_arm.mean', 'total_head.mean', 'normalized_head.mean','avg_matched_head.mean', 'total_mouth.mean', 'normalized_mouth.mean',
-       'avg_matched_mouth.mean', 'total_torso.mean', 'normalized_torso.mean','avg_matched_torso.mean']
-df = df.drop(columns=drop_cols)
+# drop_cols = ['total_foot_leg.mean','normalized_foot_leg.mean', 'avg_matched_foot_leg.mean','total_hand_arm.mean', 'normalized_hand_arm.mean',
+#        'avg_matched_hand_arm.mean', 'total_head.mean', 'normalized_head.mean','avg_matched_head.mean', 'total_mouth.mean', 'normalized_mouth.mean',
+#        'avg_matched_mouth.mean', 'total_torso.mean', 'normalized_torso.mean','avg_matched_torso.mean']
+# df = df.drop(columns=drop_cols)
 
-# add the sensitivity columns
-sensitivity_df = pd.read_json("../data/2025-11-18_12-39_fanfics_sensitivity_labelled.json", orient='records', lines=True)
-sensitivity_labels = [x for x in sensitivity_df.columns if x.startswith('sensitive_')] + ["work_id", "sensitivity_prop_above_threshold"] # just get the important columns
-sensitivity_df = sensitivity_df[sensitivity_labels]
-df = df.merge(sensitivity_df, how='left', on='work_id')
+# # add the sensitivity columns
+# sensitivity_df = pd.read_json("../data/2025-11-18_12-39_fanfics_sensitivity_labelled.json", orient='records', lines=True)
+# sensitivity_labels = [x for x in sensitivity_df.columns if x.startswith('sensitive_')] + ["work_id", "sensitivity_prop_above_threshold"] # just get the important columns
+# sensitivity_df = sensitivity_df[sensitivity_labels]
+# df = df.merge(sensitivity_df, how='left', on='work_id')
+# df.head()
+
+path = "../data/2025-11-19_fanfics_metadata_with_residuals.json"
+df = pd.read_json(path, orient='records', lines=True)
 df.head()
-
 # %%
 
 ##### sense columns and derived metrics #####
@@ -52,15 +55,16 @@ add_sense_cols = [f'{use_what}sense_sum', 'sense_overall_sum', 'sense_entropy']
 percent_sense_cols = [col for col in df.columns if col.endswith('_percent')] # percent show some of the same info so we skip them for now
 # and define the sensitivity labels
 sensitive_cols = [col for col in df.columns if col.startswith('sensitive_')] + ['sensitivity_prop_above_threshold']
-# %%
-
 
 # %%
+df.columns
+# %%
+resid_cols = [x for x in df.columns if x.endswith('_resid')]
 
 # formalize the columns we want to look at
-engagement_cols = ['kudos_hits_ratio', 'comment_hits_ratio', 'kudos_ratio_resid', 'comment_ratio_resid', 'maturity_rating', 'days_since_published']
+engagement_cols = ['kudos_hits_ratio', 'comment_hits_ratio', 'hits', 'maturity_rating', 'days_since_published']
 
-corr_cols = sense_cols_prefixed + percent_sense_cols + add_sense_cols + sensitive_cols + engagement_cols
+corr_cols = sense_cols_prefixed + percent_sense_cols + add_sense_cols + sensitive_cols + engagement_cols + resid_cols
 # heatmap of correlations
 plt.figure(figsize=(17, 15))
 corr = df[corr_cols].corr(method='spearman')
@@ -69,8 +73,7 @@ plt.title('Correlation Heatmap between Sensorimotor Scores and Engagement Metric
 plt.savefig(f"../figs/{ts}_correlation_heatmap_based_on_{use_what}.png", bbox_inches='tight')
 plt.show()
 
-# %%
-corr
+
 
 # %%
 
