@@ -26,8 +26,6 @@ This dataset includes several engagement metrics per fanfic, along with age-corr
 | `days_since_published`  | Number of days since the work was published and to 2023-01-01 (arbitrary date) |
 | `kudos_hits_ratio` | Ratio of kudos to hits (raw conversion rate)      |
 | `comment_hits_ratio` | Ratio of comments to hits (raw conversion rate)  |
-| `kudos_ratio_resid` | Residual of `kudos_hits_ratio` after regressing out `days_since_published` (age-corrected)   |
-| comment_ratio_resid | Residual of `comment_hits_ratio` after regressing out `days_since_published` (age-corrected) |
 | `maturity_rating` | Numeric code for maturity rating (0=General, 1=Teen+, 2=Mature, 3=Explicit, NaN=Not Rated) |
 | `x_resid` | Columns containing residuals from the MixedLM models for each engagement metric (comments, hits, kudos, and the two ratios). These represent how each story’s engagement compares to the expected value given its age and author: positive residuals indicate higher-than-expected engagement, negative residuals indicate lower-than-expected engagement. |
 
