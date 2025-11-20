@@ -27,11 +27,34 @@ Slight negative correlation with visual.mean (-0.14) → visual-heavy works are 
 # 4. Sensitivity labels
 Positive correlations among labels like sex, drugs, selfharm, profanity (~0.19–0.75) indicate that works flagged for one kind of sensitive content often overlap with others.
 not-sensitive is negatively correlated with all sensitive labels (-0.55 to -0.70), which is logical, this column indicates absence of sensitive content 0-1 (overall prediction by model).
-`sensitivity_prop_above_threshold`: 
 
 # 5. Engagement metrics
 
+### What we measure
+The dataset includes both raw engagement counts and “conversion-style” ratios:
+- Raw metrics: hits, kudos, comments
+- Ratios: kudos_hits_ratio — how many readers who clicked also left kudos / comment_hits_ratio — same but for comments
+- Residual versions (`x_resid`): ratios and counts after regressing out days_since_published, to correct for platform age effects.
 
-# okay
-so right now it looks like engagement metrics go down with explicit content, maturity rating, and some senses (haptic mainly). But this might just point to that we see a different form of engagement that is not captured by the engagement ratios.
-We'd want to know if they are also negatively associated with raw hits/kudos (log-transformed). If so, then it would point to that these stories just get less engagement overall, not just in terms of ratios (in terms of an engagement form).
+## General patterns
+- Hits and kudos are strongly correlated, as expected (.85).
+- Ratios behave differently: works with very high traffic tend to accumulate kudos more slowly, so their kudos-per-hit tends to be lower. Kudos are positively correlated with the ratio (.23); hits are negatively correlated with the ratio (-.21): i.e., *we see the difference between popularity (hits) and engagement rate (ratios)*.
+
+## Maturity rating amplifies this:
+It correlates positively with hits and kudos.
+It correlates negatively with the ratios — meaning higher-rated works attract more eyeballs overall but convert a smaller share of them into kudos or comments.
+
+For more on the maturity ratings relation to engagement, see the histograms in figs folder.
+
+## Sensorimotor Language
+Most individual sensory modalities show near-zero association with engagement outcomes. A small exception:
+- Haptic has a mild positive association with hits/kudos (resid); it correlates with maturity rating (.32-.36); and with most sensitivity labels (.1-.5)
+- Auditory shows similar, but inverse patterns with the same: mild negative association with hits/kudos (resid), maturity rating, and sensitivity labels.
+
+## Sensitivity Labels
+The sensitivity classifier (e.g., sex, profanity, drugs, etc.) shows a pattern similar to the maturity rating:
+Categories like sex, profanity, and drug-related content show higher hits and kudos,
+but lower ratios, suggesting a stronger casual-audience effect (more readers who browse than interact).
+
+In summary:
+Maturity rating and sensitivity labels show a consistent pattern: they are positively associated with raw engagement (hits/kudos) but negatively associated with engagement ratios (kudos_hits_ratio/comment_hits_ratio).

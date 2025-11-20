@@ -74,7 +74,8 @@ plt.savefig(f"../figs/{ts}_correlation_heatmap_based_on_{use_what}.png", bbox_in
 plt.show()
 
 
-
+# %%
+corr
 # %%
 
 # plot the relationship between months since published and kudos_hits_ratio with regression line
