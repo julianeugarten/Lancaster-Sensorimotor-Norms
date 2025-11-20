@@ -106,3 +106,33 @@ sns.histplot(df['comment_ratio_resid'].dropna(), kde=True)
 plt.title('Histogram of Comment-Hits Ratio Residuals')
 plt.show()
 # %%
+# plot the hits_resid across the maturity ratings
+plt.figure(figsize=(10, 6))
+sns.set_style("whitegrid")
+sns.histplot(data=df, x='hits_resid', hue='maturity_rating', element='step')
+plt.title('Distribution of Hits Residuals by Maturity Rating')
+plt.xlabel('Hits Residuals')
+plt.ylabel('Density')
+plt.savefig(f"../figs/{ts}_hits_resid_by_maturity_rating.png", bbox_inches='tight')
+plt.show()
+
+# and kudos_ratio_resid
+plt.figure(figsize=(10, 6))
+sns.set_style("whitegrid")
+sns.histplot(data=df, x='kudos_hits_ratio_resid', hue='maturity_rating', element='step')
+plt.title('Distribution of Kudos-Hits Ratio Residuals by Maturity Rating')
+plt.xlabel('Kudos-Hits Ratio Residuals')
+plt.ylabel('Density')
+plt.savefig(f"../figs/{ts}_kudos_ratio_resid_by_maturity_rating.png", bbox_inches='tight')
+plt.show()
+
+# and kudos_resid
+plt.figure(figsize=(10, 6))
+sns.set_style("whitegrid")
+sns.histplot(data=df, x='kudos_resid', hue='maturity_rating', element='step')
+plt.title('Distribution of Kudos Residuals by Maturity Rating')
+plt.xlabel('Kudos Residuals')
+plt.ylabel('Density')
+plt.savefig(f"../figs/{ts}_kudos_resid_by_maturity_rating.png", bbox_inches='tight')
+plt.show()  
+# %%
