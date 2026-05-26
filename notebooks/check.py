@@ -136,3 +136,77 @@ plt.ylabel('Density')
 plt.savefig(f"../figs/{ts}_kudos_resid_by_maturity_rating.png", bbox_inches='tight')
 plt.show()  
 # %%
+
+norms = pd.read_csv("../resources/cleaned_sensorimotor_norms.csv")
+norms.head()
+
+res = {}
+
+for i, text in enumerate(df['lemmatized_text']):
+    set_text = set(text)
+    valid_tokens = [token for token in set_text if token in norms['word'].values]
+    res[i] = {
+        'num_tokens': len(text),
+        'num_types': len(set_text),
+        'num_valid_types': len(valid_tokens),
+        'coverage': len(valid_tokens) / len(set_text) if set_text else 0}
+# %%
+
+res_df = pd.DataFrame.from_dict(res, orient='index')
+res_df.head()
+
+# %%
+# merge with main df
+df = df.merge(res_df, left_index=True, right_index=True)
+
+# %%
+# now let's correlate coverage with maturity_rating and engagement metrics
+# see all columns correlated with coverage
+rem_cols = ['work_id', 'title', 'author', 'rating', 'category', 'fandom',
+       'relationship', 'character', 'additional tags', 'language', 'published',
+       'status', 'status date', 'words', 'chapters', 'comments', 'kudos',
+       'bookmarks', 'hits', 'text', 'lemmatized_text',]
+norms_cols = [col for col in df.columns if any(sense in col for sense in ['auditory', 'gustatory', 'haptic', 'interoceptive', 'olfactory', 'visual'])]
+
+df_corr = df.drop(columns=rem_cols + norms_cols).corr(method='spearman')
+coverage_corr = df_corr.corr()['coverage'].sort_values(ascending=False)
+print("Correlation of coverage with other columns:")
+print(coverage_corr)
+
+# show the distibution of the maturity ratings by coverage
+mat = df[df['rating'] == 'Explicit']['coverage']
+mat1 = df[df['rating'] == 'Mature']['coverage']
+mat2 = df[df['rating'] == 'Teen And Up Audiences']['coverage']
+mat3 = df[df['rating'] == 'General Audiences']['coverage']
+
+dfs = [mat, mat1, mat2, mat3]
+
+plt.figure(figsize=(10, 6))
+for i, data in enumerate(dfs):
+    sns.kdeplot(data, label=f'Maturity Rating {i+1}', fill=True, alpha=0.1)
+plt.title('Distribution of Coverage by Maturity Rating')
+plt.xlabel('Coverage')
+plt.ylabel('Density')
+plt.xlim(0.8, 1)
+plt.legend(title='Maturity Rating', labels=['Explicit', 'Mature', 'Teen And Up Audiences', 'General Audiences', 'Not Rated'])
+plt.show()
+
+# %%
+# linear model
+# how much does maturity rating predict coverage
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+
+model = ols('coverage ~ C(rating)', data=df).fit()
+print(model.summary())
+
+# %%
+df
+# %%
+df['rating'].value_counts()
+# %%
+df.columns
+# %%
+# save to csv
+df.to_csv(f"../data/{ts}_fanfics_metadata_with_sensorimotor_and_residuals_and_coverage.csv", index=False)
+# %%
