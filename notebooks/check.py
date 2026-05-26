@@ -33,7 +33,7 @@ df.head()
 
 # decide which columns to use, here senses + normalized & engagement metrics
 sense_cols = ["auditory.mean", "gustatory.mean", "olfactory.mean", "haptic.mean", "visual.mean", "interoceptive.mean"]
-use_what = "normalized_" # set this to total, avg_matched, or normalized
+use_what = "avg_matched_" # set this to total, avg_matched, or normalized
 sense_cols_prefixed = [use_what + col for col in sense_cols]
 
 # make a sense-ratio column where all senses sum to 1
@@ -57,14 +57,21 @@ percent_sense_cols = [col for col in df.columns if col.endswith('_percent')] # p
 sensitive_cols = [col for col in df.columns if col.startswith('sensitive_')] + ['sensitivity_prop_above_threshold']
 
 # %%
-df.columns
+
+# print the avg sense scores for fanfiction
+print("Average Sense Scores for Fanfiction:")
+for sense in sense_cols_prefixed:
+    print(f"{sense}: {df[sense].mean():.4f}")
+    print(f"{df[sense].std():.4f}")
+
 # %%
 resid_cols = [x for x in df.columns if x.endswith('_resid')]
 
 # formalize the columns we want to look at
-engagement_cols = ['kudos_hits_ratio', 'comment_hits_ratio', 'hits', 'maturity_rating', 'days_since_published']
+engagement_cols = ['days_since_published', 'kudos_hits_ratio', 'comment_hits_ratio', 'hits', 'maturity_rating']
 
-corr_cols = sense_cols_prefixed + percent_sense_cols + add_sense_cols + sensitive_cols + engagement_cols + resid_cols
+corr_cols = sense_cols_prefixed + add_sense_cols + engagement_cols + resid_cols # sensitive_cols + percent_sense_cols
+
 # heatmap of correlations
 plt.figure(figsize=(17, 15))
 corr = df[corr_cols].corr(method='spearman')
@@ -73,15 +80,32 @@ plt.title('Correlation Heatmap between Sensorimotor Scores and Engagement Metric
 plt.savefig(f"../figs/{ts}_correlation_heatmap_based_on_{use_what}.png", bbox_inches='tight')
 plt.show()
 
+# heatmap of just the senses
+plt.figure(figsize=(10, 8))
+sense_corr = df[sense_cols_prefixed + add_sense_cols].corr(method='spearman')
+sns.heatmap(sense_corr, annot=True, fmt=".2f", cmap='coolwarm', cbar=False, square=True)
+plt.title('Correlation Heatmap between Sensorimotor Scores')
+plt.savefig(f"../figs/{ts}_sense_correlation_heatmap_based_on_{use_what}.png", bbox_inches='tight')
+plt.show()
+
+
+# BRING IN ANOTHER DATASET TO SEE WHETHER CORRELATIONS WITH SENS ENYTROPY HOLD UP
+
 
 # %%
-corr
+
+
+# compute the skewness metric of the sense distribution per book
+
+
+
+
 # %%
 
 # plot the relationship between months since published and kudos_hits_ratio with regression line
 plt.figure(figsize=(8, 6))
-sns.scatterplot(x='days_since_published', y='kudos_hits_ratio', data=df, alpha=0.5)
-sns.lineplot(x='days_since_published', y=model.fittedvalues, color='red', data=df)
+sns.scatterplot(x='days_since_published', y='kudos_hits_ratio_resid', data=df, alpha=0.5)
+sns.lineplot(x='days_since_published', y='kudos_hits_ratio_resid', color='red', data=df)
 plt.title('Kudos-Hits Ratio vs. Days Since Published with Regression Line')
 plt.xlabel('Days Since Published')
 plt.ylabel('Kudos-Hits Ratio')
@@ -89,8 +113,7 @@ plt.show()
 
 # lets see the comment_hits_ratio vs months since published
 plt.figure(figsize=(8, 6))
-sns.scatterplot(x='days_since_published', y='comment_hits_ratio', data=df, alpha=0.5)
-sns.lineplot(x='days_since_published', y=model_comments.fittedvalues, color='red', data=df)
+sns.scatterplot(x='days_since_published', y='comment_hits_ratio_resid', data=df, alpha=0.5)
 plt.title('Comment-Hits Ratio vs. Days Since Published with Regression Line')
 plt.xlabel('Days Since Published')
 plt.ylabel('Comment-Hits Ratio')
@@ -99,42 +122,32 @@ plt.show()
 # make historgrams of the residuals
 plt.figure(figsize=(12, 5))
 plt.subplot(1, 2, 1)
-sns.histplot(df['kudos_ratio_resid'].dropna(), kde=True)
+sns.histplot(df['kudos_hits_ratio_resid'].dropna(), kde=True)
 plt.title('Histogram of Kudos-Hits Ratio Residuals')
 plt.subplot(1, 2, 2)
-sns.histplot(df['comment_ratio_resid'].dropna(), kde=True)
+sns.histplot(df['comment_hits_ratio_resid'].dropna(), kde=True)
 plt.title('Histogram of Comment-Hits Ratio Residuals')
 plt.show()
 # %%
 # plot the hits_resid across the maturity ratings
-plt.figure(figsize=(10, 6))
+features_plot = ['kudos_hits_ratio_resid', 'comment_hits_ratio_resid', 'hits_resid']
+
+plt.figure(figsize=(18, 5))
 sns.set_style("whitegrid")
-sns.histplot(data=df, x='hits_resid', hue='maturity_rating', element='step')
-plt.title('Distribution of Hits Residuals by Maturity Rating')
-plt.xlabel('Hits Residuals')
-plt.ylabel('Density')
-plt.savefig(f"../figs/{ts}_hits_resid_by_maturity_rating.png", bbox_inches='tight')
+
+for i, feature in enumerate(features_plot):
+    plt.subplot(1, 3, i + 1)
+    sns.histplot(data=df, x=feature, hue='maturity_rating', element='step', alpha=0.2)
+    plt.title(f'{feature}')
+    plt.xlabel('Maturity Rating')
+    plt.ylabel(feature)
+    plt.xticks(rotation=45)
+
+plt.tight_layout()
+plt.savefig(f"../figs/{ts}_residuals_across_maturity_ratings.png", bbox_inches='tight')
 plt.show()
 
-# and kudos_ratio_resid
-plt.figure(figsize=(10, 6))
-sns.set_style("whitegrid")
-sns.histplot(data=df, x='kudos_hits_ratio_resid', hue='maturity_rating', element='step')
-plt.title('Distribution of Kudos-Hits Ratio Residuals by Maturity Rating')
-plt.xlabel('Kudos-Hits Ratio Residuals')
-plt.ylabel('Density')
-plt.savefig(f"../figs/{ts}_kudos_ratio_resid_by_maturity_rating.png", bbox_inches='tight')
-plt.show()
 
-# and kudos_resid
-plt.figure(figsize=(10, 6))
-sns.set_style("whitegrid")
-sns.histplot(data=df, x='kudos_resid', hue='maturity_rating', element='step')
-plt.title('Distribution of Kudos Residuals by Maturity Rating')
-plt.xlabel('Kudos Residuals')
-plt.ylabel('Density')
-plt.savefig(f"../figs/{ts}_kudos_resid_by_maturity_rating.png", bbox_inches='tight')
-plt.show()  
 # %%
 
 norms = pd.read_csv("../resources/cleaned_sensorimotor_norms.csv")
@@ -150,6 +163,7 @@ for i, text in enumerate(df['lemmatized_text']):
         'num_types': len(set_text),
         'num_valid_types': len(valid_tokens),
         'coverage': len(valid_tokens) / len(set_text) if set_text else 0}
+    
 # %%
 
 res_df = pd.DataFrame.from_dict(res, orient='index')
