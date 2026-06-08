@@ -109,6 +109,7 @@ plt.savefig(f"../figs/{ts}_sense_score_distributions_based_on_{use_what}.png", b
 plt.show()
 
 EQUAL_VAR = False
+n_runs = 100
 
 import math 
 
@@ -129,29 +130,40 @@ for sense in senses:
     fanfic_scores = df[f'{use_what}{sense}.mean'].dropna()
     chicago_scores = chic[f'{sense}_mean'].dropna()
 
-    t_stat, p_value = ttest_ind(fanfic_scores, chicago_scores, equal_var=EQUAL_VAR)
-    print(f"T-test for {sense.upper()}: {t_stat:.2f}, p = {p_value:.2e}")
-    print(f"Mann-Whitney U: {mannwhitneyu(fanfic_scores, chicago_scores).statistic:.2f}, p = {mannwhitneyu(fanfic_scores, chicago_scores).pvalue:.2e}")
-    print(f"Cohen's d: {cohend(chicago_scores, fanfic_scores):.2f}")
-    
+    # Original stats (calculate once)
+    t_stat, _ = ttest_ind(fanfic_scores, chicago_scores, equal_var=EQUAL_VAR)
+    u_stat = mannwhitneyu(fanfic_scores, chicago_scores).statistic
+    d_stat = cohend(chicago_scores, fanfic_scores)  # Keep function name intact
+
+
+    # Shuffled baseline
     shuffled = pd.concat([fanfic_scores, chicago_scores])
+    t_runs, u_runs, d_runs = [], [], []
 
-    tstat, tp, ustat, up = [], [], [], []
-    # we want to split randomly 100 times
-    for i in range(10):
-        shuffled_group1 = shuffled.sample(len(fanfic_scores), random_state=i)
-        shuffled_group2 = shuffled.drop(shuffled_group1.index)
-        tstat_run, tp_run = ttest_ind(shuffled_group1, shuffled_group2, equal_var=EQUAL_VAR)
-        ustat_run, up_run = mannwhitneyu(shuffled_group1, shuffled_group2)
-        tstat.append(tstat_run)
-        tp.append(tp_run)
-        ustat.append(ustat_run)
-        up.append(up_run)
+    for i in range(n_runs):
+        g1 = shuffled.sample(len(fanfic_scores), random_state=i)
+        g2 = shuffled.drop(g1.index)
+        t_runs.append(ttest_ind(g1, g2, equal_var=EQUAL_VAR)[0])
+        u_runs.append(mannwhitneyu(g1, g2).statistic)
+        d_runs.append(cohend(g1, g2))  # Now works (function not overwritten)
 
-    print(f"SHUFFLED T-test: {np.mean(tstat):.2f}, p = {np.mean(tp):.2e}")
-    print(f"SHUFFLED Mann-Whitney U: {np.mean(ustat):.2f}, p = {np.mean(up):.2e}")
-    print(f"SHUFFLED Cohen's d: {cohend(shuffled_group1, shuffled_group2):.2f}")
-    print("==========")
+    # Ratios
+    print(f"{sense.upper()}")
+
+    # print real
+    print(f"REAL T-test: {t_stat:.2f}")
+    print(f"REAL Mann-Whitney U: {u_stat:.2f}")
+    print(f"REAL Cohen's d: {d_stat:.2f}")
+
+    print(f"SHUFFLED T-test: {np.mean(t_runs):.2f}")
+    print(f"SHUFFLED Mann-Whitney U: {np.mean(u_runs):.2f}")
+    print(f"SHUFFLED Cohen's d: {np.mean(d_runs):.2f}")
+
+    print(f"  t: {t_stat:.2f} (×{t_stat/np.mean(t_runs):.2f})")
+    print(f"  U: {u_stat:.2f} (×{u_stat/np.mean(u_runs):.2f})")
+    print(f"  d: {d_stat:.2f} (×{d_stat/np.mean(d_runs):.2f})")
+    print("----------")
+
 
 
 # Small Effect Size: d=0.20
@@ -159,7 +171,6 @@ for sense in senses:
 # Large Effect Size: d=0.80
 
 # %%
-np.mean(tstat)
 
 # %%
 resid_cols = [x for x in df.columns if x.endswith('_resid')]
@@ -201,6 +212,9 @@ plt.show()
 
 
 # compute the skewness metric of the sense distribution per book
+# why did we want to do this? ah we wanted to see if there is a "visual" style vs other styles, and whether that correlates with engagement metrics. we can do this by looking at the skewness of the sense distribution, or by looking at the percent of the dominant sense. let's do both.
+from scipy.stats import skew, kurtosis
+
 
 
 
