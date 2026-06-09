@@ -1,16 +1,22 @@
 
-# %%
+
+
+# %%%
 # Distributions of senses across len
 import pandas as pd
 import pathlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+from colorblind_sim import simulate_plot_with_daltonlens
 
+from daltonize import daltonize
 
 # %%
 CWD = pathlib.Path.cwd().parent
 RESOURCES_DIR = CWD / "resources"
+FIGS = CWD / "figs"
+FIGS.mkdir(exist_ok=True)
 
 # %%
 # for each word, how many senses have = 0.0
@@ -83,4 +89,56 @@ plt.tight_layout()
 plt.show()
 
 
+# %%
+
+# get internal correlations between senses in the dictionary
+correlations = norms[senses].corr(method="spearman")
+
+palette = sns.color_palette("cividis", n_colors=6)
+
+fig = plt.figure(figsize=(4, 4))
+sns.heatmap(correlations, annot=True, cmap=palette, vmin=-1, vmax=1, cbar=False)
+simulate_plot_with_daltonlens(lambda: fig)
+
+# %%
+
+dist = 1 - correlations
+
+from scipy.cluster.hierarchy import linkage, leaves_list
+from scipy.spatial.distance import squareform
+
+Z = linkage(squareform(dist), method="average")
+order = leaves_list(Z)
+
+# see the hierarchical clustering dendrogram
+from scipy.cluster.hierarchy import dendrogram
+plt.figure(figsize=(5, 3.5))
+dendrogram(Z, labels=[s.split(".")[0] for s in senses], leaf_rotation=0, link_color_func=lambda x: "black")
+# rotate x-axis labels to avoid overlap
+plt.setp(plt.gca().get_xticklabels(), rotation=30, ha="center")
+plt.ylabel("Distance (1 - Spearman Correlation)")
+plt.tight_layout()
+plt.show()
+
+ordered_senses = list(np.array(senses)[order])
+
+palette = sns.color_palette("cividis", n_colors=6)
+fig = plt.figure(figsize=(4, 4))
+sns.heatmap(correlations.loc[ordered_senses, ordered_senses], annot=True, cmap=palette, vmin=-1, vmax=1, cbar=False)
+# set labels to be the sense names without the .mean suffix
+plt.yticks(np.arange(len(ordered_senses)) + 0.5, [s.split(".")[0] for s in ordered_senses])
+plt.xticks(np.arange(len(ordered_senses)) + 0.5, [s.split(".")[0] for s in ordered_senses])
+plt.tight_layout()
+# fig.savefig(FIGS / "sense_correlations.png", dpi=300, bbox_inches="tight")
+plt.show()
+
+# daltonize the figure to see how it looks under different color vision deficiencies
+sim_fig = daltonize.simulate_mpl(fig, copy=True)
+daltonized_fig = daltonize.daltonize_mpl(fig, copy=True)
+
+plt.show()
+
+ordered_senses
+# %%
+sim_fig.show()
 # %%
