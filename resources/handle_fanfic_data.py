@@ -8,51 +8,93 @@ from scipy.stats import shapiro
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 import time
+from tqdm import tqdm
+from pathlib import Path
+import ast
+
 
 # timestamp
 ts = time.strftime("%Y-%m-%d")
 print("Timestamp:", ts)
-# %%
-df = pd.read_json("../data/fanfics_metadata_with_sensorimotor_scores.json", orient='records', lines=True)
 
-drop_cols = ['total_foot_leg.mean','normalized_foot_leg.mean', 'avg_matched_foot_leg.mean','total_hand_arm.mean', 'normalized_hand_arm.mean',
-       'avg_matched_hand_arm.mean', 'total_head.mean', 'normalized_head.mean','avg_matched_head.mean', 'total_mouth.mean', 'normalized_mouth.mean',
-       'avg_matched_mouth.mean', 'total_torso.mean', 'normalized_torso.mean','avg_matched_torso.mean']
-df = df.drop(columns=drop_cols)
-
-# add the sensitivity columns
-sensitivity_df = pd.read_json("../data/2025-11-18_12-39_fanfics_sensitivity_labelled.json", orient='records', lines=True)
-sensitivity_labels = [x for x in sensitivity_df.columns if x.startswith('sensitive_')] + ["work_id", "sensitivity_prop_above_threshold"] # just get the important columns
-sensitivity_df = sensitivity_df[sensitivity_labels]
-df = df.merge(sensitivity_df, how='left', on='work_id')
-df.head()
+CWD = Path.cwd()
+DATA_PATH = CWD.parent / "data"
+FANFIC_DATA = DATA_PATH / "MythFic_txt"
 
 # %%
 
-# OBS dropping rows
+## process fanfic corpus ##
 
-print("Original length of dataframe:", len(df))
-# drop rows with missing sensorimotor scores
-sense_cols = [f'normalized_{sense}.mean' for sense in ['auditory', 'gustatory', 'olfactory', 'haptic', 'visual', 'interoceptive']]
-engagement_cols = ['kudos', 'comments', 'hits', 'days_since_published']
+# clean corpus
+meta = pd.read_csv(FANFIC_DATA / 'fanfics_Greek_myth_metadata.csv')
+print(f'Initial metadata has {len(meta)} entries.')
+# make ids strings
+meta['work_id'] = meta['work_id'].astype(str)
+# print length
+print("org data has: ", len(meta))
 
-# drop rows with value == 0 in any sense cols
-for col in sense_cols:
-    df = df[df[col] != 0]
-print("Length after dropping rows with no sensorimotor scores:", len(df))
+# check which ids do not exist as text files
+for id in meta['work_id']:
+    if not Path.exists(FANFIC_DATA / f'{id}.txt'):
+        print(f'Missing file for id: {id}')
+
+# drop rows with missing text files
+meta = meta[meta['work_id'] != "38183230"]
+print(f'Cleaned metadata has {len(meta)} entries.')
+meta.head()
+# %%
+# texts are in mythfict_txt folder, txt files named by their 'id' in metadata
+
+texts = []
+for fid in tqdm(meta['work_id']):
+    with open(FANFIC_DATA / f'{fid}.txt', 'r', encoding='utf-8') as f:
+        text = f.read()
+        texts.append(text)
+meta['text'] = texts
+meta.head()
 
 # %%
 
 # fix some cols
+df = meta.copy()
+
+# AUTHOR
+# 1. Parse string representations of lists into actual lists
+df['author'] = df['author'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) and x.startswith('[') else [x] if isinstance(x, str) else x)
+# 2. Extract authors (now that we have real lists)
+df['author'] = df['author'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x)
+
+# see nans in author_1
+nan_counts_authors = df['author'].isna().sum()
+print("Number of NaNs in author column:", nan_counts_authors)
+
+# DATE
 df['published'] = pd.to_datetime(df['published'], errors='coerce')
 # add time since published column
 reference_date = pd.to_datetime("2023-01-01")
 diff = reference_date - df['published']
 df['days_since_published'] = diff.dt.days
 
+rating_map = {
+    'General Audiences': 0,
+    'Teen And Up Audiences': 1,
+    'Mature': 2,
+    'Explicit': 3,
+    'Not Rated': np.nan} # so higher number means more mature content
+df['maturity_rating'] = df['rating'].map(rating_map)
+
+print("Original length of dataframe:", len(df))
+df.head()
+# %%
+
+##### engagement metrics #####
+
 # reception metrics
+engagement_cols = ['kudos', 'comments', 'hits', 'days_since_published']
+
 # check nan in comments and hits
 reception_cols = ['comments', 'hits', 'kudos']
+
 for col in reception_cols:
     print(f"Number of NaNs in {col}: {df[col].isna().sum()}")
     # fillna with 0
@@ -60,8 +102,6 @@ for col in reception_cols:
 
 
 # %%
-
-##### engagement metrics #####
 
 # we use ratios since "hits", for example, are very sensitive to time on the platform.
 # ratios are not subject to drift in the same way. It’s a conversion rate: how many of the people who saw this actually cared.
@@ -82,19 +122,6 @@ print("Number of NaNs in engagement ratios before regression:", df['kudos_hits_r
 # we want to look at distributions
 tmp = df.sample(n=4000, random_state=42) # sample for speed
 
-# subplot setup
-fig, axes = plt.subplots(3, 2, figsize=(15, 9))
-axes = axes.flatten()
-for i, sense in enumerate(sense_cols):
-    # shapiro
-    stat, p = shapiro(tmp[sense].dropna())
-    print(f'Shapiro-Wilk test for {sense}: stat={stat:.4f}, p={p:.4f}')
-    ax = axes[i]
-    sns.histplot(df[sense], kde=True, ax=ax)
-plt.tight_layout()
-plt.savefig(f"../figs/distributions/{ts}_sensorimotor_distributions.png")
-plt.show()
-
 fig, axes = plt.subplots(3, 2, figsize=(15, 9))
 axes = axes.flatten()
 for i, col in enumerate(engagement_cols + ['kudos_hits_ratio', 'comment_hits_ratio']):
@@ -103,6 +130,9 @@ for i, col in enumerate(engagement_cols + ['kudos_hits_ratio', 'comment_hits_rat
     print(f'Shapiro-Wilk test for {col}: stat={stat:.4f}, p={p:.4f}')
     ax = axes[i]
     sns.histplot(df[col], kde=True, ax=ax)
+    # rename x-axis
+    ax.set_xlabel(col.replace('_', ' ').title())
+sns.set_style("whitegrid")
 plt.tight_layout()
 plt.savefig(f"../figs/distributions/{ts}_engagement_distributions.png")
 plt.show()
@@ -134,13 +164,17 @@ for col in engagement_cols:
     # # store residuals
     # df[f'{col}_resid'] = model.resid
 
+    # first print the spearman corr with days_since_published
+    corr = df[[col, 'days_since_published']].dropna().corr(method='spearman').iloc[0,1]
+    print(f"Spearman correlation of {col} with days_since_published: {corr:.4f}")
+
     # # add spearman correlation of residuals with days_since_published
     # print("\n")
     # print(f"spearman of residuals {col} with days_since_published:")
     # corr = df[[f'{col}_resid', 'days_since_published']].dropna().corr(method='spearman').iloc[0,1]
     # print(f"{corr:.4f}")
 
-    # # and lets plot the regression
+    # and lets plot the regression
     # plt.figure(figsize=(8, 6))
     # sns.scatterplot(x='days_since_published', y=y_log, data=df, alpha=0.5)
     # sns.lineplot(x='days_since_published', y=model.fittedvalues, color='red', data=df)
@@ -149,12 +183,19 @@ for col in engagement_cols:
     # plt.ylabel(f'Log-Transformed {col}')
     # plt.show()
 
-# %%
 
+# %%
 #### Mixed-effects model #####
 # we want to account for author-level variability, so we use a mixed-effects model with random intercepts for authors
 
+
 # first, make sure author is categorical
+def clean_author(x):
+    if isinstance(x, list):
+        return x[0] if len(x) > 0 else None  # Empty list → None
+    return x
+
+df['author'] = df['author'].apply(clean_author)
 df['author'] = df['author'].astype('category')
 
 # Mixed-effects model loop
@@ -195,23 +236,9 @@ for col in engagement_cols:
     plt.title(f'Log {col} vs. days with MixedLM Regression Line')
     plt.show()
 
-# %%
+print(df.columns)
 df.head()
-# %%
-# finally
-# add the maturity rating as a numeric code
-rating_map = {
-    'General Audiences': 0,
-    'Teen And Up Audiences': 1,
-    'Mature': 2,
-    'Explicit': 3,
-    'Not Rated': np.nan} # so higher number means more mature content
-df['maturity_rating'] = df['rating'].map(rating_map)
-
-df.head()
-
-
 # %%
 # save to json
-df.to_json(f"../data/{ts}_fanfics_metadata_with_residuals.json", orient='records', lines=True)
+df.to_json(DATA_PATH / f"{ts}_fanfics_cleaned.json", orient='records', lines=True)
 # %%

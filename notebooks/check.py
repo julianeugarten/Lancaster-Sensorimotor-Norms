@@ -13,8 +13,10 @@ ts = time.strftime("%Y-%m-%d_%H-%M")
 print(f"Timestamp: {ts}")
 
 CWD = Path(__file__).parent
-DATA_PATH = CWD.parent / "data"
+DATA_PATH = CWD.parent / "data" / "scored_data"
 FIGS = CWD.parent / "figs"
+OUT_DIR = CWD / "OUT_DIR"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # %%
 # df = pd.read_json("../data/fanfics_metadata_with_sensorimotor_scores.json", orient='records', lines=True)
@@ -31,17 +33,22 @@ FIGS = CWD.parent / "figs"
 # df = df.merge(sensitivity_df, how='left', on='work_id')
 # df.head()
 
-path = DATA_PATH / "2025-11-19_fanfics_metadata_with_residuals.json"
+path = DATA_PATH / "fanfics_metadata_with_texts_with_scores.json"
 fanfic = pd.read_json(path, orient='records', lines=True)
 print(fanfic.columns)
 print(f"len of fanfic: {len(fanfic)}")
+# add text length
+fanfic["text_length"] = fanfic["text"].apply(lambda x: len(x.split()))
 fanfic.head()
+
 
 # %%
 gendata = DATA_PATH / "scored_data/simplestories_lemmatized_with_scores.json"
 gen_df = pd.read_json(gendata, orient='records', lines=True)
+gen_df["text_length"] = gen_df["text"].apply(lambda x: len(x.split()))
 print(gen_df.columns)
 gen_df.head()
+
 
 # %%
 
@@ -193,10 +200,6 @@ from sklearn.preprocessing import label_binarize
 fanfic["label"] = 1
 chic["label"] = 0
 gen_df["label"] = 2
-
-# add text length
-fanfic["text_length"] = fanfic["text"].apply(lambda x: len(x.split()))
-gen_df["text_length"] = gen_df["text"].apply(lambda x: len(x.split()))
 
 # downsample chicago
 chic_sampled = chic.sample(n=fanfic.shape[0], random_state=42)
