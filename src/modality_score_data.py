@@ -2,6 +2,9 @@
 import pandas as pd
 from pathlib import Path
 
+# msttr
+from lexical_diversity import lex_div as ld
+
 # %%
 
 CWD = Path(__file__).parent
@@ -14,7 +17,7 @@ OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
 
 # %%
 # get our data
-filename = "simplestories_lemmatized.json"#"fanfics_metadata_with_texts.json"
+filename = "fanfics_lemmatized.json"#simplestories
 path = DATA_PATH / filename
 data = pd.read_json(path)
 data.head()
@@ -28,6 +31,7 @@ def get_dict_scores(texts, dictionary, score_key):
     total_scores, normalized_scores, avg_matched_scores = [], [], []
     avg_matched_scores_sds = []
     n_tokens_list, n_valid_scores_list = [], []
+    unique_vs_all_lemmas, msttr_lemmas = [], []
 
     for text in texts: # loop over texts
         valid_scores = []
@@ -52,7 +56,13 @@ def get_dict_scores(texts, dictionary, score_key):
 
         n_valid_scores_list.append(len(valid_scores))
 
-    return total_scores, normalized_scores, avg_matched_scores, avg_matched_scores_sds, n_tokens_list, n_valid_scores_list
+        # stylsitics, unique lemmas/all lemmas and msttr lemma
+        unique_lemmas = set(text)
+        unique_vs_all_lemmas.append(len(unique_lemmas) / len(text) if text else 0)
+        msttr = ld.msttr(text, window_length=100) if len(text) >= 100 else None
+        msttr_lemmas.append(msttr)
+
+    return total_scores, normalized_scores, avg_matched_scores, avg_matched_scores_sds, n_tokens_list, n_valid_scores_list, unique_vs_all_lemmas, msttr_lemmas
 
 # %%
 
@@ -66,7 +76,7 @@ norms_lookup = norms.set_index('word')[norms_cols].to_dict(orient='index')
 
 for col in norms_cols:
     print(f'Processing scores for modality: {col}')
-    total_scores, normalized_scores, avg_matched_scores, avg_matched_scores_sds, n_tokens, n_valid_scores = get_dict_scores(
+    total_scores, normalized_scores, avg_matched_scores, avg_matched_scores_sds, n_tokens, n_valid_scores, unique_vs_all_lemmas, msttr_lemmas = get_dict_scores(
         data['lemmatized_text'],
         norms_lookup,
         col)
@@ -76,8 +86,13 @@ for col in norms_cols:
     data[f'avg_matched_{col}'] = avg_matched_scores
     data[f'avg_matched_{col}_sd'] = avg_matched_scores_sds
 
-    data[f'n_tokens'] = n_tokens
-    data[f'n_valid_scores'] = n_valid_scores
+    data['n_tokens'] = n_tokens
+    data[f'n_valid_scores_{col}'] = n_valid_scores
+
+    data['unique_vs_all_lemmas'] = unique_vs_all_lemmas
+    data['msttr_lemmas'] = msttr_lemmas
+
+    data[f'perc_valid_scores_{col}'] = data[f'n_valid_scores_{col}'] / data['n_tokens']
 
 data.head()
 

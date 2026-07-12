@@ -3,7 +3,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import entropy, ttest_ind, mannwhitneyu
+from scipy.stats import entropy
 import time
 import numpy as np
 from pathlib import Path
@@ -13,63 +13,45 @@ ts = time.strftime("%Y-%m-%d_%H-%M")
 print(f"Timestamp: {ts}")
 
 CWD = Path(__file__).parent
-DATA_PATH = CWD.parent / "data" / "scored_data"
+DATA_PATH = CWD.parent / "data" / "lemmatized_data" / "scored_data"
 FIGS = CWD.parent / "figs"
 OUT_DIR = CWD / "OUT_DIR"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # %%
-# df = pd.read_json("../data/fanfics_metadata_with_sensorimotor_scores.json", orient='records', lines=True)
 
-# drop_cols = ['total_foot_leg.mean','normalized_foot_leg.mean', 'avg_matched_foot_leg.mean','total_hand_arm.mean', 'normalized_hand_arm.mean',
-#        'avg_matched_hand_arm.mean', 'total_head.mean', 'normalized_head.mean','avg_matched_head.mean', 'total_mouth.mean', 'normalized_mouth.mean',
-#        'avg_matched_mouth.mean', 'total_torso.mean', 'normalized_torso.mean','avg_matched_torso.mean']
-# df = df.drop(columns=drop_cols)
+datasets = {}
 
-# # add the sensitivity columns
-# sensitivity_df = pd.read_json("../data/2025-11-18_12-39_fanfics_sensitivity_labelled.json", orient='records', lines=True)
-# sensitivity_labels = [x for x in sensitivity_df.columns if x.startswith('sensitive_')] + ["work_id", "sensitivity_prop_above_threshold"] # just get the important columns
-# sensitivity_df = sensitivity_df[sensitivity_labels]
-# df = df.merge(sensitivity_df, how='left', on='work_id')
-# df.head()
+for path in Path(DATA_PATH).glob("*.json"):
+    name = path.stem.replace("_with_scores", "").replace("_lemmatized", "")
+    datasets[name] = pd.read_json(path, orient='records', lines=True)
+    print(f"Loaded {name} dataset with {len(datasets[name])} entries.")
 
-path = DATA_PATH / "fanfics_metadata_with_texts_with_scores.json"
-fanfic = pd.read_json(path, orient='records', lines=True)
-print(fanfic.columns)
-print(f"len of fanfic: {len(fanfic)}")
-# add text length
-fanfic["text_length"] = fanfic["text"].apply(lambda x: len(x.split()))
-fanfic.head()
+datasets["fanfics"].head()
 
 
-# %%
-gendata = DATA_PATH / "scored_data/simplestories_lemmatized_with_scores.json"
-gen_df = pd.read_json(gendata, orient='records', lines=True)
-gen_df["text_length"] = gen_df["text"].apply(lambda x: len(x.split()))
-print(gen_df.columns)
-gen_df.head()
-
-
+datasets.keys()
 # %%
 
-# get Chicago
-chic = pd.read_csv(DATA_PATH / "chicago_sensory_profiles_by_file.csv")
-print(chic.columns)
-# define our sense columns
-chic_sense_cols = [x for x in chic.columns if x.endswith('_mean') and any(sense in x for sense in ['auditory', 'gustatory', 'haptic', 'interoceptive', 'olfactory', 'visual'])]
-chic = chic[chic_sense_cols + ['file_id']].copy()
+# # get Chicago
+# chic = pd.read_csv(DATA_PATH / "chicago_sensory_profiles_by_file.csv")
+# print(chic.columns)
+# # define our sense columns
+# chic_sense_cols = [x for x in chic.columns if x.endswith('_mean') and any(sense in x for sense in ['auditory', 'gustatory', 'haptic', 'interoceptive', 'olfactory', 'visual'])]
+# chic = chic[chic_sense_cols + ['file_id']].copy()
 
 # meta_chic
 meta = pd.read_excel("/Users/au324704/Desktop/CHICAGO_MEASURES_MARCH24.xlsx")
-meta = meta[["BOOK_ID", "AUTH_FIRST", "AUTH_LAST", "WORDCOUNT"]]
+meta = meta[["BOOK_ID", "AUTH_FIRST", "AUTH_LAST", "WORDCOUNT", "PUBL_DATE", "LIBRARIES", "RATING_COUNT", ]]
 meta.columns = ["file_id", "author_first", "author_last", "text_length"]
 meta["author"] = meta["author_first"] + " " + meta["author_last"]
 meta.drop(columns=["author_first", "author_last"], inplace=True)
-chic = chic.merge(meta, how='left', on='file_id')
+chic = chic.merge(datasets["chicago"], how='left', on='file_id')
 # rename cols
 chic.rename(columns={col: "avg_matched_" + col.replace("_mean", ".mean") for col in chic.columns if col.endswith('_mean') and any(sense in col for sense in ['auditory', 'gustatory', 'haptic', 'interoceptive', 'olfactory', 'visual'])}, inplace=True)
 chic.head()
 
+#datasets["chicago"] = chic
 
 # %%
 
@@ -80,7 +62,6 @@ sense_cols = ["auditory.mean", "gustatory.mean", "olfactory.mean", "haptic.mean"
 use_what = "avg_matched_" # set this to total, avg_matched, or normalized
 sense_cols_prefixed = [use_what + col for col in sense_cols]
 
-datasets = {"fanfic": fanfic, "chicago": chic, "simplestories": gen_df}
 
 # for each dataset, we want to add entropy
 def add_entropy(df, sense_cols_prefixed):
