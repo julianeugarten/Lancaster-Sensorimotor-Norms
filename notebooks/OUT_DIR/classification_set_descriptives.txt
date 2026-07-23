@@ -1,0 +1,39 @@
+3.0.5
+25.0.0
+Label mapping: {'chicago': 0, 'fanfics': 1, 'simplestories': 2, 'storyscope_claude': 3, 'storyscope_deepseek': 4, 'storyscope_gemini': 5, 'storyscope_gpt': 6, 'storyscope_kimi': 7}
+Downsampling every class to n=5084 (smallest: fanfics)
+Balanced dataset stats:
+label
+0    5084
+1    5084
+2    5084
+3    5084
+4    5084
+5    5084
+6    5084
+7    5084
+Name: count, dtype: int64
+Number of unique authors: 14986
+N unique authors per label: label
+0    2308
+1    2586
+2     499
+3    1918
+4    1916
+5    1927
+6    1916
+7    1916
+Name: author, dtype: int64
+Avg number of samples per author: 2.71
+Avg textlength per label: label
+0    40225.599331
+1     5615.792683
+2      226.126279
+3     6639.071597
+4     2875.887884
+5     3077.326515
+6     6562.310189
+7     3202.276947
+Name: n_tokens, dtype: float64
+Saved to /work/PascaleFrederikkeNikolineFeldkampMoreira#6762/Lancaster-Sensorimotor-Norms/notebooks/OUT_DIR/2026-07-23_08-48_classification_dataset.csv.gz
+File size: 2233.4 KB

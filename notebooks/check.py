@@ -7,6 +7,10 @@ from scipy.stats import entropy
 import time
 import numpy as np
 from pathlib import Path
+import openpyxl
+import re
+from math import pi
+
 
 # make time stamp
 ts = time.strftime("%Y-%m-%d_%H-%M")
@@ -31,6 +35,25 @@ datasets["fanfics"].head()
 
 
 datasets.keys()
+
+# %%
+
+storyscope = datasets["storyscope"]
+
+# extract author suffix from work_id (everything after the last underscore)
+storyscope["author"] = storyscope["work_id"].str.extract(r'_([a-zA-Z]+)$')
+
+print(storyscope["author"].value_counts())
+
+# split into separate datasets, keyed like storyscope_gpt, storyscope_claude, etc.
+for author, group in storyscope.groupby("author"):
+    key = f"storyscope_{author}"
+    datasets[key] = group.reset_index(drop=True)
+    print(f"Loaded {key} dataset with {len(datasets[key])} entries.")
+
+del datasets["storyscope"]
+datasets.keys()
+
 # %%
 
 # # get Chicago
@@ -41,17 +64,30 @@ datasets.keys()
 # chic = chic[chic_sense_cols + ['file_id']].copy()
 
 # meta_chic
-meta = pd.read_excel("/Users/au324704/Desktop/CHICAGO_MEASURES_MARCH24.xlsx")
+meta = pd.read_excel(CWD.parent / "data" / "CHICAGO_MEASURES_MARCH24.xlsx")
 meta = meta[["BOOK_ID", "AUTH_FIRST", "AUTH_LAST", "WORDCOUNT", "PUBL_DATE", "LIBRARIES", "RATING_COUNT", ]]
-meta.columns = ["file_id", "author_first", "author_last", "text_length"]
+meta.columns = ["work_id", "author_first", "author_last", "text_length", "year", "libraries", "rating_count"]
 meta["author"] = meta["author_first"] + " " + meta["author_last"]
 meta.drop(columns=["author_first", "author_last"], inplace=True)
-chic = chic.merge(datasets["chicago"], how='left', on='file_id')
+chic = datasets["chicago"].merge(meta, how='left', on='work_id')
 # rename cols
 chic.rename(columns={col: "avg_matched_" + col.replace("_mean", ".mean") for col in chic.columns if col.endswith('_mean') and any(sense in col for sense in ['auditory', 'gustatory', 'haptic', 'interoceptive', 'olfactory', 'visual'])}, inplace=True)
 chic.head()
 
-#datasets["chicago"] = chic
+
+# %%
+datasets["chicago"] = chic
+datasets.keys()
+
+# %%
+# check before filtering
+print(f"Fanfics before filtering: {len(datasets['fanfics'])}")
+
+# drop rows with zero total sense score (degenerate/near-empty texts)
+zero_mask = datasets["fanfics"][sense_cols_prefixed].sum(axis=1) == 0
+datasets["fanfics"] = datasets["fanfics"][~zero_mask].reset_index(drop=True)
+
+print(f"Fanfics after filtering: {len(datasets['fanfics'])} (dropped {zero_mask.sum()})")
 
 # %%
 
@@ -90,6 +126,23 @@ for df in datasets.keys():
         print(f"{sense}: {datasets[df][sense].mean():.3f}", f"{datasets[df][sense].std():.3f}")
     print("==========")
 
+output_path = OUT_DIR / f"{ts}_sense_score_summary.txt"
+
+with open(output_path, "w") as f:
+    for name in datasets.keys():
+        f.write(f"Dataset: {name}\n")
+        print(f"Dataset: {name}")
+        for sense in sense_cols_prefixed:
+            line = f"{sense}: {datasets[name][sense].mean():.3f} {datasets[name][sense].std():.3f}"
+            f.write(line + "\n")
+            print(line)
+        entropy_line = f"sense_entropy: {datasets[name]['sense_entropy'].mean():.3f} {datasets[name]['sense_entropy'].std():.3f}"
+        f.write(entropy_line + "\n")
+        print(entropy_line)
+        f.write("==========\n")
+        print("==========")
+
+print(f"\nSaved summary to {output_path}")
 
 # %%
 
@@ -110,113 +163,181 @@ for i, sense in enumerate(senses):
     else:
         plt.ylabel('')
 plt.tight_layout()
-plt.savefig(f"../figs/{ts}_sense_score_distributions_based_on_{use_what}.png", bbox_inches='tight')
+plt.savefig(FIGS / f"{ts}_sense_score_distributions_based_on_{use_what}.png", bbox_inches='tight')
+plt.show()
+
+fig, axes = plt.subplots(2, 3, figsize=(14, 6))
+axes = axes.flatten()
+
+emphasize = {"chicago", "fanfics", "simplestories"}
+
+for i, sense in enumerate(senses):
+    ax = axes[i]
+    for name, df in datasets.items():
+        is_main = name in emphasize
+        sns.kdeplot(
+            data=df, x=f'{use_what}{sense}.mean', label=name.capitalize(),
+            fill=is_main, alpha=0.25 if is_main else 0.9,
+            linewidth=2 if is_main else 1,
+            ax=ax
+        )
+    ax.set_xlabel(sense.capitalize())
+    ax.set_ylabel('Density' if i % 3 == 0 else '')
+
+handles, labels = axes[0].get_legend_handles_labels()
+for ax in axes:
+    if ax.get_legend(): ax.get_legend().remove()
+fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=4)
+
+plt.tight_layout()
+plt.savefig(FIGS / f"{ts}_sense_score_distributions_based_on_{use_what}.png", bbox_inches='tight')
 plt.show()
 
 # %%
-
-# we also want to see how the values distribute across the senses for each dataset, so we want to do a histplot of the percent for each sense, faceted by dataset
-# Calculate average percentages
-avg_senses = {}
-for name, df in datasets.items():
-    sense_cols = [f'{use_what}{sense}_percent' for sense in senses]
-    avg_senses[name] = df[sense_cols].mean()
-
-avg_df = pd.DataFrame(avg_senses).T  # Datasets as rows, senses as columns
-
-plt.figure(figsize=(8, 6))
-avg_df.plot(kind='bar', stacked=True, ax=plt.gca(), color=sns.color_palette("husl", len(senses)))
-plt.ylabel('Average Percentage')
-plt.xlabel('Dataset')
-plt.title('Average Sense Distribution by Dataset')
-# set the legend to the senses list
-plt.legend(title='Sense', labels=[sense.capitalize() for sense in senses], bbox_to_anchor=(1.05, 1), loc='upper left')
-plt.tight_layout()
-plt.show()
-
 
 from math import pi
 
-# Calculate averages
-avg_df = pd.DataFrame({name: df[[f'{use_what}{s}_percent' for s in senses]].mean()
-                      for name, df in datasets.items()}).T
+# collapse Storyscope models into one group, keep everything else separate
+main_groups = {
+    "Chicago": datasets["chicago"],
+    "Fanfics": datasets["fanfics"],
+    "SimpleStories": datasets["simplestories"],
+    "Storyscope": pd.concat(
+        [df for name, df in datasets.items() if name.startswith("storyscope_")]
+    ),
+}
 
-# Plot
-plt.figure(figsize=(6, 6))
+percent_cols = [f'{use_what}{s}_percent' for s in senses]
+avg_df = pd.DataFrame({name: df[percent_cols].mean() for name, df in main_groups.items()}).T
+avg_df.columns = senses  # clean labels
+
 angles = [n / float(len(senses)) * 2 * pi for n in range(len(senses))]
 angles += angles[:1]
 
-ax = plt.subplot(111, polar=True)
-ax.set_theta_offset(pi/2)
+fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+ax.set_theta_offset(pi / 2)
 ax.set_theta_direction(-1)
-plt.xticks(angles[:-1], senses)
 
-for name, row in avg_df.iterrows():
+plt.xticks(angles[:-1], [s.capitalize() for s in senses], fontsize=11)
+ax.tick_params(axis='x', pad=15)
+
+ax.set_rlabel_position(0)
+plt.yticks(fontsize=8, color='black')
+ax.set_ylim(0, avg_df.values.max() * 1.15)
+
+colors = sns.color_palette("colorblind", len(avg_df))
+markers = ['o', 'o','o', 'o', 'o']
+
+for (name, row), color, marker in zip(avg_df.iterrows(), colors, markers):
     values = row.tolist()
     values += values[:1]
-    ax.plot(angles, values, linewidth=2, linestyle='solid', label=name.capitalize())
-    ax.fill(angles, values, alpha=0.25)
-plt.legend(loc='upper right', bbox_to_anchor=(1, 0.7))
+    ax.plot(angles, values, linewidth=2, marker=marker, markersize=6,
+             label=name, color=color)
+
+plt.legend(loc='upper right', bbox_to_anchor=(0.9, 1), frameon=False, fontsize=10)
+plt.tight_layout()
+plt.savefig(f"../figs/{ts}_radar_modalities.png", bbox_inches='tight', dpi=500)
 plt.show()
 
 # %%
-gen_df[["generation_id","persona","style","theme","topic"]]
+datasets.keys()
 
-gen_df["author"] = gen_df["persona"] + "_" + gen_df["style"]
+# %%
+
+datasets['simplestories']["author"] = datasets['simplestories']["persona"] + "_" + datasets['simplestories']["style"]
 
 # print all authors > 20 VC
 print("Authors with more than 20 generated stories:")
-print(gen_df["author"].value_counts()[gen_df["author"].value_counts() > 10])
+print(datasets['simplestories']["author"].value_counts()[datasets['simplestories']["author"].value_counts() > 10])
+
+for gen_df in ['storyscope_claude', 'storyscope_deepseek', 'storyscope_gemini', 'storyscope_gpt', 'storyscope_kimi']:
+    datasets[gen_df]['author'] = datasets[gen_df]['author'] + "_" + datasets[gen_df]['human_author']
+    print("Authors with more than 20 generated stories:")
+    print(datasets[gen_df]["author"].value_counts()[datasets[gen_df]["author"].value_counts() > 10])
+
+
+
 
 # %%
+
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
-import numpy as np
 from sklearn.preprocessing import label_binarize
+import pyarrow as pa
+print(pd.__version__)
+print(pa.__version__)
 
+# --- assign integer labels to every dataset key, in a fixed, reproducible order ---
+class_names = sorted(datasets.keys())          # fixed order so label ints are stable across runs
+label_map = {name: i for i, name in enumerate(class_names)}
+print("Label mapping:", label_map)
 
-fanfic["label"] = 1
-chic["label"] = 0
-gen_df["label"] = 2
+cols = sense_cols_prefixed + ["label", "author", "n_tokens", "sense_entropy"]
 
-# downsample chicago
-chic_sampled = chic.sample(n=fanfic.shape[0], random_state=42)
-gen_df_sampled = gen_df.sample(n=fanfic.shape[0], random_state=42)
+# smallest dataset sets the downsample target for balanced classes
+min_n = min(len(df) for df in datasets.values())
+print(f"Downsampling every class to n={min_n} (smallest: "
+      f"{min(datasets, key=lambda k: len(datasets[k]))})")
 
-cols = sense_cols_prefixed + ["label", "author", "text_length", "sense_entropy"]
+pieces = []
+for name, df in datasets.items():
+    d = df.copy()
+    d["label"] = label_map[name]
+    d = d.sample(n=min_n, random_state=42)
+    pieces.append(d[cols])
 
-together = pd.concat([fanfic[cols], chic_sampled[cols], gen_df_sampled[cols]], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
+together = pd.concat(pieces, axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
 
 # create unique dummy author IDs for missing authors
 missing_mask = together["author"].isna()
 together.loc[missing_mask, "author"] = [f"missing_author_{i}" for i in range(missing_mask.sum())]
 groups = together["author"].astype(str)
-print(f"Balanced dataset stats: {together['label'].value_counts()}")
+
+print(f"Balanced dataset stats:\n{together['label'].value_counts().sort_index()}")
 print(f"Number of unique authors: {groups.nunique()}")
 print(f"N unique authors per label: {together.groupby('label')['author'].nunique()}")
 print(f"Avg number of samples per author: {together.groupby('author').size().mean():.2f}")
-print(f"Avg textlength per label: {together.groupby('label')['text_length'].mean()}")
+print(f"Avg textlength per label: {together.groupby('label')['n_tokens'].mean()}")
 
-# now drop text_length column since we don't need it for classification
-together = together.drop(columns=["text_length"])
+# drop text_length, not used as a feature (but keep it in a saved file if you want the length-confound check later)
+together = together.drop(columns=["n_tokens"])
 
+together["author"] = together["author"].astype("object")
 
-together.head(20)
+out_path = OUT_DIR / f"{ts}_classification_dataset.csv.gz"
+
+together.to_csv(out_path, index=False, compression="gzip")
+
+print(f"Saved to {out_path}")
+print(f"File size: {out_path.stat().st_size / 1024:.1f} KB")
+
 # %%
+
+# %%
+
 X = together[sense_cols_prefixed]
 y = together["label"]
 groups = together["author"]
 
+# derive class info from the data instead of hardcoding
+class_labels = sorted(y.unique())  # e.g. [0, 1, 2, 3, ...]
+n_classes = len(class_labels)
 
-# Setup: Use multinomial logistic regression for 3 classes
+# human-readable names for plotting — inverts the label_map you built earlier
+# (label_map = {name: i for i, name in enumerate(class_names)})
+inv_label_map = {v: k for k, v in label_map.items()}
+class_display_names = [inv_label_map[c].replace("_", " ").title() for c in class_labels]
+
+print(f"Classes found: {dict(zip(class_labels, class_display_names))}")
+
+# Setup: multinomial logistic regression, works for any n_classes >= 2
 model = make_pipeline(
     StandardScaler(),
     LogisticRegression(
-        multi_class='multinomial',  # Critical for 3+ classes
-        solver='lbfgs',              # Supports multinomial
+        solver='lbfgs',
         max_iter=1000,
         random_state=42))
 
@@ -228,17 +349,12 @@ scores = {
     "macro_precision": [],
     "macro_recall": [],
     "macro_f1": [],
-    "roc_auc_ovr": []} # One-vs-Rest AUC for multi-class
+    "roc_auc_ovr": []}
 
-per_class_scores = {
-    '0_precision': [], '0_recall': [], '0_f1': [],
-    '1_precision': [], '1_recall': [], '1_f1': [],
-    '2_precision': [], '2_recall': [], '2_f1': []}
+# build per-class score dict dynamically
+per_class_scores = {f'{c}_{metric}': [] for c in class_labels for metric in ['precision', 'recall', 'f1']}
 
-
-all_coefs = []  # Store coefficients for ALL classes
-
-# save all true and predicted labels for confusion matrix
+all_coefs = []
 all_y_true = []
 all_y_pred = []
 
@@ -248,25 +364,25 @@ for fold, (train_idx, test_idx) in enumerate(cv.split(X, y, groups), 1):
 
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)  # Shape: (n_samples, 3)
+    y_proba = model.predict_proba(X_test)  # Shape: (n_samples, n_classes)
 
     all_y_true.extend(y_test.tolist())
     all_y_pred.extend(y_pred.tolist())
 
-    # Multi-class ROC AUC (One-vs-Rest)
+    # Multi-class ROC AUC (One-vs-Rest) — works for any n_classes
     roc_auc = roc_auc_score(
-        label_binarize(y_test, classes=[0, 1, 2]),
+        label_binarize(y_test, classes=class_labels),
         y_proba,
         multi_class='ovr'
     )
 
-    # Use macro-average for multi-class metrics
     report = classification_report(y_test, y_pred, output_dict=True)
 
-    for class_label in ['0', '1', '2']:
-        per_class_scores[f'{class_label}_precision'].append(report[class_label]['precision'])
-        per_class_scores[f'{class_label}_recall'].append(report[class_label]['recall'])
-        per_class_scores[f'{class_label}_f1'].append(report[class_label]['f1-score'])
+    for c in class_labels:
+        key = str(c)  # classification_report keys are strings of the label
+        per_class_scores[f'{c}_precision'].append(report[key]['precision'])
+        per_class_scores[f'{c}_recall'].append(report[key]['recall'])
+        per_class_scores[f'{c}_f1'].append(report[key]['f1-score'])
 
     scores["fold"].append(fold)
     scores["accuracy"].append(model.score(X_test, y_test))
@@ -282,35 +398,196 @@ print("\n--- Average Performance Across Folds ---")
 for metric in ["accuracy", "macro_precision", "macro_recall", "macro_f1", "roc_auc_ovr"]:
     print(f"{metric}: {np.mean(scores[metric]):.4f} ± {np.std(scores[metric]):.4f}")
 
-# Print per-class results
+# Per-class results, using real names
 print("\n--- Per-Class Performance (mean ± std) ---")
-for class_label in ['0', '1', '2']:
-    print(f"\nClass {class_label}:")
+for c, name in zip(class_labels, class_display_names):
+    print(f"\nClass {c} ({name}):")
     for metric in ['precision', 'recall', 'f1']:
-        key = f'{class_label}_{metric}'
+        key = f'{c}_{metric}'
         print(f"  {metric}: {np.mean(per_class_scores[key]):.4f} ± {np.std(per_class_scores[key]):.4f}")
 
 # Coefficients: average across folds for each class
 coef_array = np.array(all_coefs)  # Shape: (n_folds, n_classes, n_features)
-for class_idx in range(coef_array.shape[1]):  # Use shape[1] instead of hardcoded 3
-    print(f"\nClass {class_idx} coefficients (mean ± std):")
+for class_idx in range(coef_array.shape[1]):
+    name = class_display_names[class_idx]
+    print(f"\nClass {class_labels[class_idx]} ({name}) coefficients (mean ± std):")
     print(pd.DataFrame({
         'mean': coef_array[:, class_idx, :].mean(axis=0),
         'std': coef_array[:, class_idx, :].std(axis=0)}, index=sense_cols_prefixed).sort_values('mean', ascending=False))
 
+# Confusion matrix, sized and labeled dynamically
+cm = confusion_matrix(all_y_true, all_y_pred, labels=class_labels)
 
-# After the loop, create and plot the matrix:
-cm = confusion_matrix(all_y_true, all_y_pred)
-
-plt.figure(figsize=(3, 3), dpi=500)
+fig_size = max(3, n_classes * 0.9)  # scale figure size with number of classes
+plt.figure(figsize=(fig_size, fig_size), dpi=500)
 sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False,
-            xticklabels=['Published', 'Fanfiction', 'SimStories'],
-            yticklabels=['Published', 'Fanfiction', 'SimStories'])
+            xticklabels=class_display_names,
+            yticklabels=class_display_names)
 plt.xlabel(r'$\bf{Predicted}$')
 plt.ylabel(r'$\bf{True}$')
-plt.xticks(rotation=10)
+plt.xticks(rotation=30, ha='right')
 plt.yticks(rotation=0)
+plt.tight_layout()
 plt.show()
+
+# %%
+
+# --- build class groups: Chicago, Fanfics, SimpleStories, Storyscope (combined) ---
+storyscope_combined = pd.concat(
+    [df for name, df in datasets.items() if name.startswith("storyscope_")],
+    axis=0
+)
+
+class_groups = {
+    "chicago": datasets["chicago"],
+    "fanfics": datasets["fanfics"],
+    "simplestories": datasets["simplestories"],
+    "storyscope": storyscope_combined,
+}
+
+class_names = sorted(class_groups.keys())
+label_map = {name: i for i, name in enumerate(class_names)}
+print("Label mapping:", label_map)
+
+cols = sense_cols_prefixed + ["label", "author", "n_tokens", "sense_entropy"]
+
+# downsample every class to Fanfiction's size, as before
+target_n = len(class_groups["fanfics"])
+print(f"Downsampling every class to n={target_n} (Fanfiction size)")
+
+pieces = []
+for name, df in class_groups.items():
+    d = df.copy()
+    d["label"] = label_map[name]
+    n = min(target_n, len(d))  # guard in case a class is smaller than target_n
+    if n < target_n:
+        print(f"WARNING: {name} has only {len(d)} rows, less than target {target_n}")
+    d = d.sample(n=n, random_state=42)
+    pieces.append(d[cols])
+
+together = pd.concat(pieces, axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
+
+# dummy author IDs for missing authors
+missing_mask = together["author"].isna()
+together.loc[missing_mask, "author"] = [f"missing_author_{i}" for i in range(missing_mask.sum())]
+groups = together["author"].astype(str)
+
+print(f"Balanced dataset stats:\n{together['label'].value_counts().sort_index()}")
+print(f"Number of unique authors: {groups.nunique()}")
+print(f"N unique authors per label: {together.groupby('label')['author'].nunique()}")
+print(f"Avg number of samples per author: {together.groupby('author').size().mean():.2f}")
+print(f"Avg textlength per label: {together.groupby('label')['n_tokens'].mean()}")
+
+together = together.drop(columns=["n_tokens"])
+
+X = together[sense_cols_prefixed]
+y = together["label"]
+groups = together["author"]
+
+class_labels = sorted(y.unique())
+n_classes = len(class_labels)
+
+inv_label_map = {v: k for k, v in label_map.items()}
+class_display_names = [inv_label_map[c].replace("_", " ").title() for c in class_labels]
+
+print(f"Classes found: {dict(zip(class_labels, class_display_names))}")
+
+model = make_pipeline(
+    StandardScaler(),
+    LogisticRegression(
+        solver='lbfgs',
+        max_iter=1000,
+        random_state=42))
+
+cv = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
+
+scores = {
+    "fold": [],
+    "accuracy": [],
+    "macro_precision": [],
+    "macro_recall": [],
+    "macro_f1": [],
+    "roc_auc_ovr": []}
+
+per_class_scores = {f'{c}_{metric}': [] for c in class_labels for metric in ['precision', 'recall', 'f1']}
+
+all_coefs = []
+all_y_true = []
+all_y_pred = []
+
+for fold, (train_idx, test_idx) in enumerate(cv.split(X, y, groups), 1):
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)
+
+    all_y_true.extend(y_test.tolist())
+    all_y_pred.extend(y_pred.tolist())
+
+    roc_auc = roc_auc_score(
+        label_binarize(y_test, classes=class_labels),
+        y_proba,
+        multi_class='ovr'
+    )
+
+    report = classification_report(y_test, y_pred, output_dict=True)
+
+    for c in class_labels:
+        key = str(c)
+        per_class_scores[f'{c}_precision'].append(report[key]['precision'])
+        per_class_scores[f'{c}_recall'].append(report[key]['recall'])
+        per_class_scores[f'{c}_f1'].append(report[key]['f1-score'])
+
+    scores["fold"].append(fold)
+    scores["accuracy"].append(model.score(X_test, y_test))
+    scores["macro_precision"].append(report['macro avg']['precision'])
+    scores["macro_recall"].append(report['macro avg']['recall'])
+    scores["macro_f1"].append(report['macro avg']['f1-score'])
+    scores["roc_auc_ovr"].append(roc_auc)
+
+    all_coefs.append(model.named_steps['logisticregression'].coef_)
+
+print("\n--- Average Performance Across Folds ---")
+for metric in ["accuracy", "macro_precision", "macro_recall", "macro_f1", "roc_auc_ovr"]:
+    print(f"{metric}: {np.mean(scores[metric]):.4f} ± {np.std(scores[metric]):.4f}")
+
+print("\n--- Per-Class Performance (mean ± std) ---")
+for c, name in zip(class_labels, class_display_names):
+    print(f"\nClass {c} ({name}):")
+    for metric in ['precision', 'recall', 'f1']:
+        key = f'{c}_{metric}'
+        print(f"  {metric}: {np.mean(per_class_scores[key]):.4f} ± {np.std(per_class_scores[key]):.4f}")
+
+coef_array = np.array(all_coefs)
+for class_idx in range(coef_array.shape[1]):
+    name = class_display_names[class_idx]
+    print(f"\nClass {class_labels[class_idx]} ({name}) coefficients (mean ± std):")
+    print(pd.DataFrame({
+        'mean': coef_array[:, class_idx, :].mean(axis=0),
+        'std': coef_array[:, class_idx, :].std(axis=0)}, index=sense_cols_prefixed).sort_values('mean', ascending=False))
+
+cm = confusion_matrix(all_y_true, all_y_pred, labels=class_labels)
+
+fig_size = max(3, n_classes * 0.9)
+plt.figure(figsize=(fig_size, fig_size), dpi=500)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False,
+            xticklabels=class_display_names,
+            yticklabels=class_display_names)
+plt.xlabel(r'$\bf{Predicted}$')
+plt.ylabel(r'$\bf{True}$')
+plt.xticks(rotation=30, ha='right')
+plt.yticks(rotation=0)
+plt.tight_layout()
+plt.savefig(f"../figs/{ts}_confusion_matrix_4class.png", bbox_inches='tight')
+plt.show()
+
+# %%
+
+
+
+
 
 
 # %%
