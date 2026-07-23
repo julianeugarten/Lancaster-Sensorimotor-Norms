@@ -5,3 +5,5 @@ scipy
 numpy
 scikit-learn
 openpyxl
+statsmodels
+stats
