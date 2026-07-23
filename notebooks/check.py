@@ -229,6 +229,25 @@ class_names = sorted(class_groups.keys())
 label_map = {name: i for i, name in enumerate(class_names)}
 print("Label mapping:", label_map)
 
+# %%
+# ============================================================
+# CONFIG: pool ALL generated sources into one class
+# ============================================================
+generated_combined = pd.concat(
+    [datasets["simplestories"]] + [df for name, df in datasets.items() if name.startswith("storyscope_")],
+    axis=0)
+
+class_groups = {
+    "chicago": datasets["chicago"],
+    "fanfics": datasets["fanfics"],
+    "generated": generated_combined,
+}
+DATASETS_USED = "three_regime"
+
+class_names = sorted(class_groups.keys())
+label_map = {name: i for i, name in enumerate(class_names)}
+print("Label mapping:", label_map)
+
 # ============================================================
 # Assemble balanced dataset
 # ============================================================

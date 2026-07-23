@@ -1,3 +1,4 @@
 data/
-OUT_DIR/minimalist_classification_dataset.csv.gz
-OUT_DIR/full_classification_dataset.csv.gz
+notebooks/OUT_DIR/minimalist_classification_dataset.csv.gz
+notebooks/OUT_DIR/full_classification_dataset.csv.gz
+notebooks/OUT_DIR/three_regime_classification_dataset.csv.gz
