@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import entropy
+from scipy import stats
 import time
 import numpy as np
 from pathlib import Path
@@ -143,28 +144,60 @@ for ds in list(datasets.keys()):
 
 # %%
 
-for df in datasets.keys():
-    print(f"Dataset: {df}")
-    for sense in sense_cols_prefixed:
-        print(f"{sense}: {datasets[df][sense].mean():.3f}", f"{datasets[df][sense].std():.3f}")
-    print("==========")
-
 output_path = OUT_DIR / f"{ts}_sense_score_summary.txt"
+lines = []
+
+def log(msg=""):
+    print(msg)
+    lines.append(str(msg))
+
+rows = []  # for a tidy long-format CSV alongside the txt
+
+for name, df in datasets.items():
+    log(f"Dataset: {name}")
+    log("-" * (len(name) + 9))
+
+    for sense in sense_cols_prefixed:
+        sense_label = sense.replace("avg_matched_", "").replace(".mean", "")
+        coverage_col = "perc_valid_scores_" + sense.replace("avg_matched_", "")
+
+        sense_mean = df[sense].mean()
+        sense_sd = df[sense].std()
+        cov_mean = df[coverage_col].mean()
+        cov_sd = df[coverage_col].std()
+
+        # correlation between this sense's score and the text's overall sense entropy
+        rho, pval = stats.spearmanr(df[sense], df["sense_entropy"])
+
+        log(f"  {sense_label:15s}  mean={sense_mean:.3f}  sd={sense_sd:.3f}   "
+            f"coverage: mean={cov_mean:.3f} sd={cov_sd:.3f}   "
+            f"entropy corr: rho={rho:+.3f} p={pval:.3g}")
+
+        rows.append({
+            "dataset": name,
+            "sense": sense_label,
+            "score_mean": sense_mean,
+            "score_sd": sense_sd,
+            "coverage_mean": cov_mean,
+            "coverage_sd": cov_sd,
+            "entropy_corr_rho": rho,
+            "entropy_corr_p": pval,
+        })
+
+    entropy_mean = df["sense_entropy"].mean()
+    entropy_sd = df["sense_entropy"].std()
+    log(f"  {'sense_entropy':15s}  mean={entropy_mean:.3f}  sd={entropy_sd:.3f}")
+    log("=" * 60)
 
 with open(output_path, "w") as f:
-    for name in datasets.keys():
-        f.write(f"Dataset: {name}\n")
-        print(f"Dataset: {name}")
-        for sense in sense_cols_prefixed:
-            line = f"{sense}: {datasets[name][sense].mean():.3f} {datasets[name][sense].std():.3f}"
-            f.write(line + "\n")
-            print(line)
-        entropy_line = f"sense_entropy: {datasets[name]['sense_entropy'].mean():.3f} {datasets[name]['sense_entropy'].std():.3f}"
-        f.write(entropy_line + "\n")
-        print(entropy_line)
-        f.write("==========\n")
-        print("==========")
+    f.write("\n".join(lines))
 print(f"\nSaved summary to {output_path}")
+
+# tidy long-format CSV: one row per (dataset, sense) — easy to pivot into paper tables later
+summary_df = pd.DataFrame(rows)
+csv_path = OUT_DIR / f"{ts}_sense_score_summary.csv"
+summary_df.to_csv(csv_path, index=False)
+print(f"Saved tidy summary to {csv_path}")
 
 # %%
 
