@@ -176,28 +176,74 @@ axes = axes.flatten()
 
 emphasize = {"chicago", "fanfics", "simplestories"}
 
+main_styles = {
+    "chicago":       {"color": "0.05", "linestyle": "-"},
+    "fanfics":       {"color": "0.35", "linestyle": "--"},
+    "simplestories": {"color": "0.65", "linestyle": "-."},
+}
+
+storyscope_names = [name for name in datasets if name.startswith("storyscope_")]
+storyscope_palette = sns.color_palette("husl", len(storyscope_names))
+storyscope_colors = dict(zip(storyscope_names, storyscope_palette))
+
+# keep track of handles/labels separately for main vs. storyscope, in plotting order
+main_handles, main_labels = [], []
+storyscope_handles, storyscope_labels = [], []
+
 for i, sense in enumerate(senses):
     ax = axes[i]
+    col = f'{use_what}{sense}.mean'
+
+    pooled_vals = pd.concat([df[col] for df in datasets.values()])
+    lo, hi = pooled_vals.quantile([0.002, 0.998])  # loosened from 0.005/0.995
+
     for name, df in datasets.items():
-        is_main = name in emphasize
-        sns.kdeplot(
-            data=df, x=f'{use_what}{sense}.mean', label=name.capitalize(),
-            fill=is_main, alpha=0.25 if is_main else 0.9,
-            linewidth=2 if is_main else 1,
-            ax=ax
-        )
+        if name in emphasize:
+            style = main_styles[name]
+            line = sns.kdeplot(
+                data=df, x=col, label=name.capitalize(),
+                fill=True, alpha=0.15,
+                color=style["color"], linestyle=style["linestyle"],
+                linewidth=2.2,
+                ax=ax, clip=(lo, hi),
+            )
+        else:
+            line = sns.kdeplot(
+                data=df, x=col, label=name.capitalize(),
+                fill=False, alpha=0.85,
+                color=storyscope_colors[name],
+                linewidth=1,
+                ax=ax, clip=(lo, hi),
+            )
+
+    ax.set_xlim(lo, hi)
     ax.set_xlabel(sense.capitalize())
     ax.set_ylabel('Density' if i % 3 == 0 else '')
 
-handles, labels = axes[0].get_legend_handles_labels()
+    # grab handles/labels only once, from the first subplot
+    if i == 0:
+        all_handles, all_labels = ax.get_legend_handles_labels()
+        for h, l in zip(all_handles, all_labels):
+            if l.lower() in emphasize:
+                main_handles.append(h)
+                main_labels.append(l)
+            else:
+                storyscope_handles.append(h)
+                storyscope_labels.append(l)
+
 for ax in axes:
     if ax.get_legend(): ax.get_legend().remove()
-fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=4)
+
+# two explicit legend rows: main categories on top, Storyscope models below
+leg1 = fig.legend(main_handles, main_labels, loc='upper center',
+                   bbox_to_anchor=(0.5, 1.12), ncol=len(main_handles), frameon=False)
+fig.add_artist(leg1)
+fig.legend(storyscope_handles, storyscope_labels, loc='upper center',
+           bbox_to_anchor=(0.5, 1.06), ncol=len(storyscope_handles), frameon=False)
 
 plt.tight_layout()
 plt.savefig(FIGS / f"{ts}_sense_score_distributions_based_on_{use_what}.png", bbox_inches='tight')
 plt.show()
-
 
 # %%
 
