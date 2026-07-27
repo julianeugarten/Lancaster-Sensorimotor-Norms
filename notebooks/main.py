@@ -449,7 +449,6 @@ results_raw = run_classification(together, sense_cols_prefixed, label_map, rando
 # Structured output: per-fold metrics, per-class metrics, coefficients
 # ============================================================
 
-import json
 
 def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, out_dir, figs_dir, use_what):
     class_labels = results_raw["class_labels"]
