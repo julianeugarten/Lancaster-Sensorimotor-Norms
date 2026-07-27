@@ -1,0 +1,98 @@
+======================================================================
+ROBUSTNESS CHECK: LENGTH, COVERAGE, AND LEXICAL DIVERSITY
+Generated: 2026-07-27
+======================================================================
+
+--- 1. Within-Chicago regression: n_tokens -> visual score ---
+
+beta (n_tokens) = -3.7514e-08
+p-value         = 0.3729
+R-squared       = 0.0001
+n               = 9092
+
+--- 2. Pooled regression: corpus + n_tokens -> visual score ---
+
+n_tokens: beta = -1.2817e-07, p = 1.9e-06
+n = 61064
+
+Corpus effects (relative to reference corpus):
+  fanfics                   beta = -0.5881   p = 0
+  simplestories             beta = -0.4263   p = 0
+  storyscope_claude         beta = -0.6351   p = 0
+  storyscope_deepseek       beta = -0.5347   p = 0
+  storyscope_gemini         beta = -0.5630   p = 0
+  storyscope_gpt            beta = -0.5378   p = 0
+  storyscope_kimi           beta = -0.5337   p = 0
+
+--- 3. Within-corpus Spearman correlations: n_tokens vs. visual score ---
+
+chicago                    rho=-0.010   p=0.3436   n=9092
+fanfics                    rho=-0.011   p=0.4539   n=5084
+simplestories              rho=-0.179   p=1.266e-72   n=10000
+storyscope_claude          rho=-0.317   p=2.969e-172   n=7372
+storyscope_deepseek        rho=+0.059   p=4.885e-07   n=7375
+storyscope_gemini          rho=+0.046   p=8.89e-05   n=7375
+storyscope_gpt             rho=+0.049   p=2.328e-05   n=7383
+storyscope_kimi            rho=-0.038   p=0.001007   n=7383
+
+--- 4. Coverage & MSTTR: descriptive stats and correlation with visual score ---
+
+
+chicago
+-------
+  Coverage (perc_valid_scores_visual):  mean=0.822  sd=0.046  n=9092
+  MSTTR (lexical diversity):             mean=0.828  sd=0.038  n=9092 (of 9092)
+  Coverage vs. visual score:  rho=+0.088  p=6.326e-17
+  MSTTR vs. visual score:     rho=-0.031  p=0.003334
+
+fanfics
+-------
+  Coverage (perc_valid_scores_visual):  mean=0.951  sd=0.051  n=5084
+  MSTTR (lexical diversity):             mean=0.679  sd=0.039  n=4955 (of 5084)
+  Coverage vs. visual score:  rho=+0.086  p=7.686e-10
+  MSTTR vs. visual score:     rho=+0.183  p=1.063e-38
+
+simplestories
+-------------
+  Coverage (perc_valid_scores_visual):  mean=0.982  sd=0.019  n=10000
+  MSTTR (lexical diversity):             mean=0.678  sd=0.036  n=9521 (of 10000)
+  Coverage vs. visual score:  rho=-0.027  p=0.006155
+  MSTTR vs. visual score:     rho=+0.002  p=0.8364
+
+storyscope_claude
+-----------------
+  Coverage (perc_valid_scores_visual):  mean=0.971  sd=0.014  n=7372
+  MSTTR (lexical diversity):             mean=0.656  sd=0.029  n=7353 (of 7372)
+  Coverage vs. visual score:  rho=-0.090  p=1.214e-14
+  MSTTR vs. visual score:     rho=+0.446  p=0
+
+storyscope_deepseek
+-------------------
+  Coverage (perc_valid_scores_visual):  mean=0.961  sd=0.019  n=7375
+  MSTTR (lexical diversity):             mean=0.709  sd=0.029  n=7370 (of 7375)
+  Coverage vs. visual score:  rho=-0.049  p=2.95e-05
+  MSTTR vs. visual score:     rho=+0.243  p=2.748e-99
+
+storyscope_gemini
+-----------------
+  Coverage (perc_valid_scores_visual):  mean=0.962  sd=0.017  n=7375
+  MSTTR (lexical diversity):             mean=0.683  sd=0.018  n=7372 (of 7375)
+  Coverage vs. visual score:  rho=-0.125  p=4.373e-27
+  MSTTR vs. visual score:     rho=+0.345  p=5.463e-205
+
+storyscope_gpt
+--------------
+  Coverage (perc_valid_scores_visual):  mean=0.969  sd=0.015  n=7383
+  MSTTR (lexical diversity):             mean=0.759  sd=0.020  n=7380 (of 7383)
+  Coverage vs. visual score:  rho=-0.184  p=2.755e-57
+  MSTTR vs. visual score:     rho=+0.359  p=1.229e-223
+
+storyscope_kimi
+---------------
+  Coverage (perc_valid_scores_visual):  mean=0.961  sd=0.018  n=7383
+  MSTTR (lexical diversity):             mean=0.710  sd=0.023  n=7381 (of 7383)
+  Coverage vs. visual score:  rho=-0.069  p=2.635e-09
+  MSTTR vs. visual score:     rho=+0.322  p=9.809e-178
+
+======================================================================
+END OF ROBUSTNESS CHECK

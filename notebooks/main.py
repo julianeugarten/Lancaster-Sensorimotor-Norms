@@ -16,6 +16,7 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy import stats
 
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -47,30 +48,33 @@ for path in sorted(Path(DATA_PATH).glob("*.json")):
 datasets.keys()
 
 # %%
+
 ### Build author labels ###
 
 datasets["simplestories"]["author"] = (datasets["simplestories"]["persona"] + "_" + datasets["simplestories"]["style"])
 
-storyscope = datasets.pop("storyscope")
-storyscope["model"] = storyscope["work_id"].str.extract(r"_([a-zA-Z]+)$")
-storyscope["author"] = storyscope["model"] + "_" + storyscope["human_author"]
+datasets["storyscope"]["model"] = datasets["storyscope"]["work_id"].str.extract(r"_([a-zA-Z]+)$")
+datasets["storyscope"]["author"] = datasets["storyscope"]["model"] + "_" + datasets["storyscope"]["human_author"]
 
-print(storyscope["model"].value_counts(dropna=False))
+print(datasets["storyscope"]["model"].value_counts(dropna=False))
 
 # %%
-### Split storyscope into per-model datasets ###
+### Also split storyscope into per-model datasets (combined "storyscope" stays too) ###
 
-for model, group in storyscope.groupby("model"):
+for model, group in datasets["storyscope"].groupby("model"):
     datasets[f"storyscope_{model}"] = group.drop(columns="model").reset_index(drop=True)
 
 storyscope_keys = [k for k in datasets if k.startswith("storyscope_")]
 print(storyscope_keys)
 
+datasets["storyscope"] = datasets["storyscope"].drop(columns="model")
+
 # sanity check
-for key in ["simplestories", *storyscope_keys]:
+for key in ["simplestories", "storyscope", *storyscope_keys]:
     vc = datasets[key]["author"].value_counts()
     print(f"\n{key} — authors with >10 stories:")
     print(vc[vc > 10])
+
 
 # %%
 
@@ -83,6 +87,8 @@ meta.columns = ["work_id", "author_first", "author_last", "text_length", "year",
 meta["author"] = meta["author_first"] + " " + meta["author_last"]
 meta.drop(columns=["author_first", "author_last"], inplace=True)
 chic = datasets["chicago"].merge(meta, how='left', on='work_id')
+# drop dups
+chic = chic.drop_duplicates(subset="work_id")
 # rename cols
 chic.rename(columns={col: "avg_matched_" + col.replace("_mean", ".mean") for col in chic.columns if col.endswith('_mean') and any(sense in col for sense in ['auditory', 'gustatory', 'haptic', 'interoceptive', 'olfactory', 'visual'])}, inplace=True)
 
@@ -132,8 +138,9 @@ for ds in list(datasets.keys()):
     print(f"After filtering: {len(datasets[ds])} (dropped {zero_mask.sum()})")
 
 
+
 # %%
-### Summary statistics per dataset ###
+### SUMMARY STATISTICS / DATASET ###
 
 output_path = OUT_DIR / f"{ts}_sense_score_summary.txt"
 lines = []
@@ -148,6 +155,7 @@ for name, df in datasets.items():
     log(f"Dataset: {name}")
     log("-" * (len(name) + 9))
     log(f"  N texts: {len(df)}")
+    log(f"  N unique authors: {df['author'].nunique()}")
 
     coverage_col = "perc_valid_scores_" + sense_cols[0].replace(USE_WHAT, "")
     cov_mean, cov_sd = df[coverage_col].mean(), df[coverage_col].std()
@@ -169,8 +177,8 @@ for name, df in datasets.items():
             "score_mean": df[sense].mean(), "score_sd": df[sense].std(),
             "coverage_mean": cov_mean, "coverage_sd": cov_sd,
             "entropy_corr_rho": rho, "entropy_corr_p": pval,
+            "n_unique_authors": df["author"].nunique(),
         })
-
     log(f"  {'sense_entropy':15s}  mean={df['sense_entropy'].mean():.3f}  sd={df['sense_entropy'].std():.3f}")
     log("=" * 60)
 
@@ -181,7 +189,10 @@ summary_df = pd.DataFrame(rows)
 summary_df.to_csv(OUT_DIR / f"{ts}_sense_score_summary.csv", index=False)
 print(f"Saved tidy summary to {OUT_DIR / f'{ts}_sense_score_summary.csv'}")
 
+
 # %%
+
+### PLOT KDE ####
 
 # we want to do a kde plot of the distribution of each sense score for fanfiction and chicago, to see how they compare
 senses = ["auditory", "gustatory", "olfactory", "haptic", "visual", "interoceptive"]
@@ -195,7 +206,11 @@ main_styles = {"chicago":       {"color": "0.05", "linestyle": "-"},
             "fanfics":       {"color": "0.3", "linestyle": "--"},
             "simplestories": {"color": "0.45", "linestyle": ":"}}
 
-storyscope_names = [name for name in datasets if name.startswith("storyscope_")]
+# exclude the combined "storyscope" entry — per-model versions are shown individually,
+# and including both would double-count rows in the pooled quantile calc below
+plot_datasets = {k: v for k, v in datasets.items() if k != "storyscope"}
+
+storyscope_names = [name for name in plot_datasets if name.startswith("storyscope_")]
 storyscope_palette = sns.color_palette("husl", len(storyscope_names))
 storyscope_colors = dict(zip(storyscope_names, storyscope_palette))
 
@@ -207,10 +222,10 @@ for i, sense in enumerate(senses):
     ax = axes[i]
     col = f'{USE_WHAT}{sense}.mean'
 
-    pooled_vals = pd.concat([df[col] for df in datasets.values()])
+    pooled_vals = pd.concat([df[col] for df in plot_datasets.values()])
     lo, hi = pooled_vals.quantile([0.002, 0.998])  # loosened from 0.005/0.995
 
-    for name, df in datasets.items():
+    for name, df in plot_datasets.items():
         if name in emphasize:
             style = main_styles[name]
             line = sns.kdeplot(
@@ -256,7 +271,6 @@ sns.set_style("whitegrid")
 plt.tight_layout()
 plt.savefig(FIGS / f"{ts}_sense_score_distributions_based_on_{USE_WHAT}.png", bbox_inches='tight')
 plt.show()
-
 # %%
 
 ### CLASSIFICATION ###
@@ -314,8 +328,8 @@ print("Label mapping:", label_map)
 # Assemble balanced dataset
 # ============================================================
 
-def build_balanced_dataset(class_groups, label_map, sense_cols, random_state, out_dir, ts, mode):
-    cols = sense_cols + ["label", "author", "n_tokens", "sense_entropy"]
+def build_balanced_dataset(class_groups, label_map, sense_cols, random_state, out_dir, ts, mode, extra_cols=None):
+    cols = sense_cols + ["label", "author", "n_tokens", "sense_entropy"] + (extra_cols or [])
     target_n = min(len(df) for df in class_groups.values())
     smallest = min(class_groups, key=lambda k: len(class_groups[k]))
     print(f"Downsampling every class to n={target_n} (smallest: {smallest})")
@@ -331,13 +345,11 @@ def build_balanced_dataset(class_groups, label_map, sense_cols, random_state, ou
 
     together = pd.concat(pieces, axis=0).sample(frac=1, random_state=random_state).reset_index(drop=True)
 
-    # dummy-ids for any still-missing authors (belt-and-braces; should mostly be handled upstream now)
     missing_mask = together["author"].isna()
     if missing_mask.any():
         together.loc[missing_mask, "author"] = [f"missing_author_{i}" for i in range(missing_mask.sum())]
         print(f"Filled {missing_mask.sum()} missing authors with dummy ids")
 
-    # log summary
     summary_lines = [
         f"Balanced dataset stats:\n{together['label'].value_counts().sort_index()}",
         f"Number of unique authors: {together['author'].nunique()}",
@@ -350,17 +362,15 @@ def build_balanced_dataset(class_groups, label_map, sense_cols, random_state, ou
         print(line)
     (out_dir / f"{ts}_{mode}_classification_data_summary.txt").write_text("\n".join(summary_lines))
 
-    together = together.drop(columns=["n_tokens"])
     together["author"] = together["author"].astype("object")
 
     out_path = out_dir / f"{mode}_classification_dataset.csv.gz"
-    together.to_csv(out_path, index=False, compression="gzip")
+    # exclude the raw text column from the saved CSV — keep the file lean, text can be re-derived
+    save_cols = [c for c in together.columns if c != "lemmatized_text"]
+    together[save_cols].drop(columns=["n_tokens"]).to_csv(out_path, index=False, compression="gzip")
     print(f"Saved balanced dataset to {out_path}")
 
-    return together
-
-
-together = build_balanced_dataset(class_groups, label_map, sense_cols_prefixed, random_state, OUT_DIR, ts, MODE)
+    return together  # keep n_tokens + lemmatized_text in memory for MFW step
 
 # %%
 # ============================================================
@@ -436,12 +446,7 @@ def run_classification(together, sense_cols, label_map, random_state=42, n_split
         "scores": scores,
         "per_class_scores": per_class_scores,
         "coef_array": coef_array,
-        "cm": cm,
-    }
-
-
-results_raw = run_classification(together, sense_cols_prefixed, label_map, random_state=random_state)
-
+        "cm": cm}
 
 # %%
 
@@ -450,7 +455,7 @@ results_raw = run_classification(together, sense_cols_prefixed, label_map, rando
 # ============================================================
 
 
-def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, out_dir, figs_dir, use_what):
+def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, out_dir, figs_dir, use_what, print_top_n=None):
     class_labels = results_raw["class_labels"]
     class_display_names = results_raw["class_display_names"]
     scores = results_raw["scores"]
@@ -462,11 +467,12 @@ def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, ou
     # coefficients per class
     for class_idx in range(coef_array.shape[1]):
         name = class_display_names[class_idx]
+        n_print = print_top_n if print_top_n is not None else len(sense_cols)
         print(f"\nClass {class_labels[class_idx]} ({name}) coefficients (mean ± std):")
         print(pd.DataFrame({
             "mean": coef_array[:, class_idx, :].mean(axis=0),
             "std": coef_array[:, class_idx, :].std(axis=0),
-        }, index=sense_cols).sort_values("mean", ascending=False))
+        }, index=sense_cols).sort_values("mean", ascending=False).head(n_print))
 
     # confusion matrix plot
     fig_size = max(3, n_classes * 0.9)
@@ -551,16 +557,73 @@ def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, ou
     print(f"Saved per-class metrics and coefficients CSVs for mode={mode}")
 
 
+# %%
+# ============================================================
+# Build Pipeline
+# ============================================================
+
+
+together = build_balanced_dataset(
+    class_groups, label_map, sense_cols_prefixed, random_state, OUT_DIR, ts, MODE,
+    extra_cols=["lemmatized_text"])
+
+results_raw = run_classification(together, sense_cols_prefixed, label_map, random_state=random_state)
 save_classification_outputs(results_raw, label_map, sense_cols_prefixed, MODE, ts, OUT_DIR, FIGS, USE_WHAT)
 
 
 # %%
+# ============================================================
+# Build MFW features x 2 and run pipeline
+# ============================================================
 
-# ============================================================
-# Coefficient plot — one panel per class, fully dynamic
-# ============================================================
+def build_mfw_features(together, text_col="lemmatized_text", n_features=100, relative=True):
+    """
+    Builds top-N most-frequent-word features from a column of tokenized/lemmatized text
+    (list of tokens per row). Vocabulary is selected on the whole corpus, unsupervised
+    (no label information used), consistent with standard stylometric MFW practice.
+    """
+    vectorizer = CountVectorizer(max_features=n_features, analyzer=lambda tokens: tokens, lowercase=False)
+    X_counts = vectorizer.fit_transform(together[text_col])
+    feature_names = [f"mfw_{w}" for w in vectorizer.get_feature_names_out()]
+
+    X_df = pd.DataFrame(X_counts.toarray(), columns=feature_names, index=together.index)
+
+    if relative:
+        # normalize by text length so longer texts don't just have larger raw counts
+        text_lengths = together[text_col].apply(len).replace(0, np.nan)
+        X_df = X_df.div(text_lengths, axis=0).fillna(0)
+
+    print(f"Built {len(feature_names)} MFW features (relative={relative})")
+    print(f"Top 10 words: {[f.replace('mfw_', '') for f in feature_names[:10]]}")
+
+    return X_df, feature_names
+
+
+mfw_df, mfw_cols = build_mfw_features(together, n_features=100, relative=True)
+together_mfw = pd.concat([together.drop(columns=["lemmatized_text"]), mfw_df], axis=1)
+
+
+results_raw_mfw = run_classification(together_mfw, mfw_cols, label_map, random_state=random_state)
+save_classification_outputs(
+    results_raw_mfw, label_map, mfw_cols, mode=f"{MODE}_mfw100",
+    ts=ts, out_dir=OUT_DIR, figs_dir=FIGS, use_what="mfw_")
+
+
+mfw6_df, mfw6_cols = build_mfw_features(together, n_features=6, relative=True)
+together_mfw6 = pd.concat([together.drop(columns=["lemmatized_text"]), mfw6_df], axis=1)
+
+results_raw_mfw6 = run_classification(together_mfw6, mfw6_cols, label_map, random_state=random_state)
+save_classification_outputs(
+    results_raw_mfw6, label_map, mfw6_cols, mode=f"{MODE}_mfw6",
+    ts=ts, out_dir=OUT_DIR, figs_dir=FIGS, use_what="mfw_")
 
 # %%
+
+# ============================================================
+# Coefficient plot — one panel per class
+# ============================================================
+
+
 def plot_coefficients(results_raw, sense_cols, use_what, mode, ts, figs_dir):
     coef_array = results_raw["coef_array"]
     class_display_names = results_raw["class_display_names"]
@@ -612,7 +675,66 @@ def plot_coefficients(results_raw, sense_cols, use_what, mode, ts, figs_dir):
 
 plot_coefficients(results_raw, sense_cols, USE_WHAT, MODE, ts, FIGS)
 
+# %%
 
+
+# TESTING HOW WELL NETROPY ALONE DOES
+
+X_entropy = together[["sense_entropy"]]
+y = together["label"]
+groups = together["author"]
+
+class_labels = sorted(y.unique())
+inv_label_map = {v: k for k, v in label_map.items()}
+class_display_names = [inv_label_map[c].replace("_", " ").title() for c in class_labels]
+
+model_entropy = make_pipeline(
+    StandardScaler(),
+    LogisticRegression(solver='lbfgs', max_iter=1000, random_state=42))
+
+cv = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
+
+per_class_scores = {f'{c}_{metric}': [] for c in class_labels for metric in ['precision', 'recall', 'f1']}
+scores_entropy = []
+roc_auc_scores = []
+all_y_true, all_y_pred = [], []
+
+for train_idx, test_idx in cv.split(X_entropy, y, groups):
+    X_train, X_test = X_entropy.iloc[train_idx], X_entropy.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+    model_entropy.fit(X_train, y_train)
+    y_pred = model_entropy.predict(X_test)
+    y_proba = model_entropy.predict_proba(X_test)
+
+    all_y_true.extend(y_test.tolist())
+    all_y_pred.extend(y_pred.tolist())
+
+    roc_auc = roc_auc_score(label_binarize(y_test, classes=class_labels), y_proba, multi_class='ovr')
+    roc_auc_scores.append(roc_auc)
+
+    report = classification_report(y_test, y_pred, output_dict=True)
+    for c in class_labels:
+        key = str(c)
+        per_class_scores[f'{c}_precision'].append(report[key]['precision'])
+        per_class_scores[f'{c}_recall'].append(report[key]['recall'])
+        per_class_scores[f'{c}_f1'].append(report[key]['f1-score'])
+
+    scores_entropy.append(model_entropy.score(X_test, y_test))
+
+print(f"Accuracy using entropy alone: {np.mean(scores_entropy):.4f} ± {np.std(scores_entropy):.4f}")
+print(f"ROC AUC (OvR): {np.mean(roc_auc_scores):.4f} ± {np.std(roc_auc_scores):.4f}\n")
+
+print("--- Per-Class Performance (mean ± std) ---")
+for c, name in zip(class_labels, class_display_names):
+    print(f"\nClass {c} ({name}):")
+    for metric in ['precision', 'recall', 'f1']:
+        key = f'{c}_{metric}'
+        print(f"  {metric}: {np.mean(per_class_scores[key]):.4f} ± {np.std(per_class_scores[key]):.4f}")
+
+cm = confusion_matrix(all_y_true, all_y_pred, labels=class_labels)
+print("\nConfusion matrix:")
+print(cm)
 
 
 # %%
@@ -620,6 +742,9 @@ plot_coefficients(results_raw, sense_cols, USE_WHAT, MODE, ts, FIGS)
 ##### ROBUSTNESS CHECK: LENGTH / COVERAGE / DIVERSITY CONFOUNDS #####
 
 coverage_col = "perc_valid_scores_visual.mean"
+
+robustness_datasets = {k: v for k, v in datasets.items() if k != "storyscope"}
+
 lines = []  # collect everything to write at the end
 
 def log(msg=""):
@@ -636,7 +761,7 @@ log("="*70)
 # ------------------------------------------------------------------
 log("\n--- 1. Within-Chicago regression: n_tokens -> visual score ---\n")
 
-chic_df = datasets["chicago"]
+chic_df = robustness_datasets["chicago"]
 X_len = sm.add_constant(chic_df["n_tokens"])
 y_visual = chic_df["avg_matched_visual.mean"]
 model_chic = sm.OLS(y_visual, X_len).fit()
@@ -652,7 +777,7 @@ log(f"n               = {int(model_chic.nobs)}")
 log("\n--- 2. Pooled regression: corpus + n_tokens -> visual score ---\n")
 
 all_dfs = []
-for name, df in datasets.items():
+for name, df in robustness_datasets.items():
     d = df[["avg_matched_visual.mean", "n_tokens"]].copy()
     d["corpus"] = name
     all_dfs.append(d)
@@ -673,7 +798,7 @@ for term in model_pooled.params.index:
 # ------------------------------------------------------------------
 log("\n--- 3. Within-corpus Spearman correlations: n_tokens vs. visual score ---\n")
 
-for name, df in datasets.items():
+for name, df in robustness_datasets.items():
     rho, pval = stats.spearmanr(df["n_tokens"], df["avg_matched_visual.mean"])
     log(f"{name:25s}  rho={rho:+.3f}   p={pval:.4g}   n={len(df)}")
 
@@ -682,7 +807,7 @@ for name, df in datasets.items():
 # ------------------------------------------------------------------
 log("\n--- 4. Coverage & MSTTR: descriptive stats and correlation with visual score ---\n")
 
-for name, df in datasets.items():
+for name, df in robustness_datasets.items():
     log(f"\n{name}")
     log("-" * len(name))
 

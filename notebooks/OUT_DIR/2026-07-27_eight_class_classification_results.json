@@ -1,0 +1,501 @@
+{
+  "timestamp": "2026-07-27",
+  "dataset_config": "eight_class",
+  "n_classes": 8,
+  "class_labels": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "class_display_names": [
+    "Chicago",
+    "Fanfics",
+    "Simplestories",
+    "Storyscope Claude",
+    "Storyscope Deepseek",
+    "Storyscope Gemini",
+    "Storyscope Gpt",
+    "Storyscope Kimi"
+  ],
+  "label_map": {
+    "chicago": 0,
+    "fanfics": 1,
+    "simplestories": 2,
+    "storyscope_claude": 3,
+    "storyscope_deepseek": 4,
+    "storyscope_gemini": 5,
+    "storyscope_gpt": 6,
+    "storyscope_kimi": 7
+  },
+  "n_folds": 5,
+  "overall_metrics": {
+    "accuracy": {
+      "mean": 0.5487557598670152,
+      "std": 0.007541040956415307
+    },
+    "macro_precision": {
+      "mean": 0.5405386004448532,
+      "std": 0.008342425345497484
+    },
+    "macro_recall": {
+      "mean": 0.5487572730123336,
+      "std": 0.007555983019924461
+    },
+    "macro_f1": {
+      "mean": 0.5426407245822986,
+      "std": 0.007623821411216574
+    },
+    "roc_auc_ovr": {
+      "mean": 0.8718237858672143,
+      "std": 0.003886151703303515
+    }
+  },
+  "per_fold_metrics": {
+    "accuracy": [
+      0.5476336816226183,
+      0.5392747387830362,
+      0.5623847572218807,
+      0.5484386525694616,
+      0.5460469691380794
+    ],
+    "macro_precision": [
+      0.5401471484128437,
+      0.5357575509412169,
+      0.5563649932461542,
+      0.538190012205383,
+      0.5322332974186681
+    ],
+    "macro_recall": [
+      0.5476044787819664,
+      0.5393020908337784,
+      0.5624385447394298,
+      0.5484112605393352,
+      0.5460299901671584
+    ],
+    "macro_f1": [
+      0.541742156344611,
+      0.5354292519022543,
+      0.557105464130345,
+      0.5415104114079969,
+      0.5374163391262858
+    ],
+    "roc_auc_ovr": [
+      0.8721634625459178,
+      0.86533191028397,
+      0.877571063588189,
+      0.8722887961558199,
+      0.8717636967621742
+    ]
+  },
+  "per_class_metrics": {
+    "Chicago": {
+      "precision": {
+        "mean": 0.9900665813599032,
+        "std": 0.002469811045393789
+      },
+      "recall": {
+        "mean": 0.9992133726647001,
+        "std": 0.0003933136676499415
+      },
+      "f1": {
+        "mean": 0.9946175717779508,
+        "std": 0.0013418205391675288
+      }
+    },
+    "Fanfics": {
+      "precision": {
+        "mean": 0.45577619416327686,
+        "std": 0.016420545242011735
+      },
+      "recall": {
+        "mean": 0.5102292523169117,
+        "std": 0.02145442497137266
+      },
+      "f1": {
+        "mean": 0.4809318795988101,
+        "std": 0.00933084711431081
+      }
+    },
+    "Simplestories": {
+      "precision": {
+        "mean": 0.7157547440083567,
+        "std": 0.011852238694527726
+      },
+      "recall": {
+        "mean": 0.7138201751329756,
+        "std": 0.04451088545231869
+      },
+      "f1": {
+        "mean": 0.7138719653116505,
+        "std": 0.020539149266497622
+      }
+    },
+    "Storyscope Claude": {
+      "precision": {
+        "mean": 0.6230278035158955,
+        "std": 0.02237773460340302
+      },
+      "recall": {
+        "mean": 0.7651448989230328,
+        "std": 0.00749324211079014
+      },
+      "f1": {
+        "mean": 0.6866786320006566,
+        "std": 0.016383867011771025
+      }
+    },
+    "Storyscope Deepseek": {
+      "precision": {
+        "mean": 0.3645320635875763,
+        "std": 0.008439424412769325
+      },
+      "recall": {
+        "mean": 0.30035595661161824,
+        "std": 0.006299616370513088
+      },
+      "f1": {
+        "mean": 0.32931443587695297,
+        "std": 0.006478804484524704
+      }
+    },
+    "Storyscope Gemini": {
+      "precision": {
+        "mean": 0.41546289755508975,
+        "std": 0.03659466788706059
+      },
+      "recall": {
+        "mean": 0.40518798535138856,
+        "std": 0.02081717691034959
+      },
+      "f1": {
+        "mean": 0.4099492644865202,
+        "std": 0.026934045924578105
+      }
+    },
+    "Storyscope Gpt": {
+      "precision": {
+        "mean": 0.40125106591826787,
+        "std": 0.024293701827306887
+      },
+      "recall": {
+        "mean": 0.35031337343893965,
+        "std": 0.01781860646968744
+      },
+      "f1": {
+        "mean": 0.37401118177100273,
+        "std": 0.020413739494131524
+      }
+    },
+    "Storyscope Kimi": {
+      "precision": {
+        "mean": 0.3584374534504594,
+        "std": 0.009575984566096957
+      },
+      "recall": {
+        "mean": 0.34579316965910234,
+        "std": 0.020065684793210897
+      },
+      "f1": {
+        "mean": 0.3517508658348448,
+        "std": 0.013244241842625527
+      }
+    }
+  },
+  "coefficients": {
+    "Chicago": {
+      "avg_matched_auditory.mean": {
+        "mean": 0.6509894172265739,
+        "std": 0.14336140619567747
+      },
+      "avg_matched_gustatory.mean": {
+        "mean": 0.05002391806520209,
+        "std": 0.10446781154034074
+      },
+      "avg_matched_olfactory.mean": {
+        "mean": -1.094500185710028,
+        "std": 0.17775951026656353
+      },
+      "avg_matched_haptic.mean": {
+        "mean": -0.9247064151324496,
+        "std": 0.17272911960816
+      },
+      "avg_matched_visual.mean": {
+        "mean": 8.48198373107324,
+        "std": 0.20842631960352678
+      },
+      "avg_matched_interoceptive.mean": {
+        "mean": 3.1489590061194406,
+        "std": 0.11403321426220968
+      }
+    },
+    "Fanfics": {
+      "avg_matched_auditory.mean": {
+        "mean": -0.0848473355567114,
+        "std": 0.009524571189459425
+      },
+      "avg_matched_gustatory.mean": {
+        "mean": -0.42355052473198296,
+        "std": 0.051070932924680006
+      },
+      "avg_matched_olfactory.mean": {
+        "mean": 0.03657179247757002,
+        "std": 0.05834487121943998
+      },
+      "avg_matched_haptic.mean": {
+        "mean": 0.33794576016781586,
+        "std": 0.05012363401831334
+      },
+      "avg_matched_visual.mean": {
+        "mean": -1.4267425600963195,
+        "std": 0.09549072544809642
+      },
+      "avg_matched_interoceptive.mean": {
+        "mean": 1.0343269113260098,
+        "std": 0.03312734932451128
+      }
+    },
+    "Simplestories": {
+      "avg_matched_auditory.mean": {
+        "mean": 0.7189074013477351,
+        "std": 0.02239520525399967
+      },
+      "avg_matched_gustatory.mean": {
+        "mean": 0.24702454719348613,
+        "std": 0.040260215142883235
+      },
+      "avg_matched_olfactory.mean": {
+        "mean": -0.3037450043062636,
+        "std": 0.023329018413176077
+      },
+      "avg_matched_haptic.mean": {
+        "mean": -1.281880187871502,
+        "std": 0.0435775263914066
+      },
+      "avg_matched_visual.mean": {
+        "mean": 4.248671914379235,
+        "std": 0.08470377544369925
+      },
+      "avg_matched_interoceptive.mean": {
+        "mean": 1.0003603951368703,
+        "std": 0.04204972087786862
+      }
+    },
+    "Storyscope Claude": {
+      "avg_matched_auditory.mean": {
+        "mean": 0.45409649592697965,
+        "std": 0.024534156019329574
+      },
+      "avg_matched_gustatory.mean": {
+        "mean": 0.7038808926676875,
+        "std": 0.038417976263813
+      },
+      "avg_matched_olfactory.mean": {
+        "mean": 0.9950134090459585,
+        "std": 0.03899679694423272
+      },
+      "avg_matched_haptic.mean": {
+        "mean": 0.20309770974825056,
+        "std": 0.07718650572456698
+      },
+      "avg_matched_visual.mean": {
+        "mean": -5.0226158847363065,
+        "std": 0.04937314941169727
+      },
+      "avg_matched_interoceptive.mean": {
+        "mean": -2.250729898790476,
+        "std": 0.030064154912392185
+      }
+    },
+    "Storyscope Deepseek": {
+      "avg_matched_auditory.mean": {
+        "mean": 0.2398385588701971,
+        "std": 0.03753842646911878
+      },
+      "avg_matched_gustatory.mean": {
+        "mean": 0.6028564560190486,
+        "std": 0.022510078525971616
+      },
+      "avg_matched_olfactory.mean": {
+        "mean": -0.5590850807014599,
+        "std": 0.028189389786242428
+      },
+      "avg_matched_haptic.mean": {
+        "mean": -0.061091304118636114,
+        "std": 0.02082147734401244
+      },
+      "avg_matched_visual.mean": {
+        "mean": -0.16854436984777826,
+        "std": 0.03484030681630079
+      },
+      "avg_matched_interoceptive.mean": {
+        "mean": -0.8352143471921993,
+        "std": 0.030932247109632428
+      }
+    },
+    "Storyscope Gemini": {
+      "avg_matched_auditory.mean": {
+        "mean": -0.9177505967173498,
+        "std": 0.031818358374437826
+      },
+      "avg_matched_gustatory.mean": {
+        "mean": -0.7786454931604609,
+        "std": 0.045798794066194186
+      },
+      "avg_matched_olfactory.mean": {
+        "mean": 0.9598355316319422,
+        "std": 0.049301745274562395
+      },
+      "avg_matched_haptic.mean": {
+        "mean": 1.0541174884513658,
+        "std": 0.029646524757100615
+      },
+      "avg_matched_visual.mean": {
+        "mean": -3.9601949035178405,
+        "std": 0.07649143329467747
+      },
+      "avg_matched_interoceptive.mean": {
+        "mean": -1.2973669009579303,
+        "std": 0.03745057724497873
+      }
+    },
+    "Storyscope Gpt": {
+      "avg_matched_auditory.mean": {
+        "mean": 0.03623322515913404,
+        "std": 0.03172590728766182
+      },
+      "avg_matched_gustatory.mean": {
+        "mean": 0.1413503604422736,
+        "std": 0.023787889969714704
+      },
+      "avg_matched_olfactory.mean": {
+        "mean": -0.6022491344396286,
+        "std": 0.01728151922127
+      },
+      "avg_matched_haptic.mean": {
+        "mean": -0.09914618444714793,
+        "std": 0.026866517995828804
+      },
+      "avg_matched_visual.mean": {
+        "mean": -0.14470669758941562,
+        "std": 0.05447213280198982
+      },
+      "avg_matched_interoceptive.mean": {
+        "mean": -0.29118153971111616,
+        "std": 0.019035633144513238
+      }
+    },
+    "Storyscope Kimi": {
+      "avg_matched_auditory.mean": {
+        "mean": -1.0974671662565558,
+        "std": 0.041483662004001415
+      },
+      "avg_matched_gustatory.mean": {
+        "mean": -0.5429401564952594,
+        "std": 0.0327284944488093
+      },
+      "avg_matched_olfactory.mean": {
+        "mean": 0.5681586720019027,
+        "std": 0.043315139837531914
+      },
+      "avg_matched_haptic.mean": {
+        "mean": 0.7716631332023071,
+        "std": 0.030849356539384785
+      },
+      "avg_matched_visual.mean": {
+        "mean": -2.0078512296648183,
+        "std": 0.05941285181961791
+      },
+      "avg_matched_interoceptive.mean": {
+        "mean": -0.5091536259305967,
+        "std": 0.026137883377892454
+      }
+    }
+  },
+  "confusion_matrix": [
+    [
+      5080,
+      0,
+      4,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      31,
+      2594,
+      487,
+      720,
+      157,
+      349,
+      257,
+      489
+    ],
+    [
+      19,
+      450,
+      3629,
+      179,
+      223,
+      82,
+      302,
+      200
+    ],
+    [
+      0,
+      225,
+      51,
+      3890,
+      396,
+      387,
+      54,
+      81
+    ],
+    [
+      1,
+      498,
+      474,
+      444,
+      1527,
+      475,
+      1119,
+      546
+    ],
+    [
+      0,
+      472,
+      27,
+      506,
+      414,
+      2060,
+      398,
+      1207
+    ],
+    [
+      0,
+      742,
+      263,
+      250,
+      1057,
+      367,
+      1781,
+      624
+    ],
+    [
+      0,
+      722,
+      139,
+      261,
+      416,
+      1257,
+      531,
+      1758
+    ]
+  ]
+}
