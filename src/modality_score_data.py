@@ -17,9 +17,10 @@ OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
 
 # %%
 # get our data
-filename = "fanfics_lemmatized.json"#simplestories
+filename = "fanfics_mia_lemmatized.json"#simplestories
 path = DATA_PATH / filename
 data = pd.read_json(path)
+print(len(data))
 data.head()
 
 
