@@ -7,3 +7,6 @@ scikit-learn
 openpyxl
 statsmodels
 stats
+datasets
+spacy
+en-core-web-sm

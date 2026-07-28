@@ -10,17 +10,19 @@ from pathlib import Path
 
 CWD = Path.cwd()
 DATA_PATH = CWD.parent / "data"
+print(DATA_PATH)
 OUT_DIR= DATA_PATH / "lemmatized_data"
 mkdir = OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# %%
 # =========== Adjust below =============
 
-FILENAME = "storyscope"
+FILENAME = "fanfics_mia"
 SAVENAME = FILENAME + "_lemmatized.json"
 
 # # load a file / dataset
-ds = load_dataset("jjrussell10/storyscope")
-df = pd.DataFrame(ds["train"])
+# ds = load_dataset("jjrussell10/storyscope")
+# df = pd.DataFrame(ds["train"])
 # rename
 #df = df.rename(columns={"story": "text"})
 # sample subset of the data for testing
@@ -28,7 +30,7 @@ df = pd.DataFrame(ds["train"])
 
 # OR file
 
-#df = pd.read_json(DATA_PATH / "2026-07-09_fanfics_cleaned.json", orient='records', lines=True)
+df = pd.read_csv(DATA_PATH / "data_subset_chr27.csv", sep=",")#/ "2026-07-09_fanfics_cleaned.json", orient='records', lines=True)
 print(f"len of df: {len(df)}")
 print(df.columns)
 df.head()
@@ -77,6 +79,8 @@ df.head()
 
 
 # %%
+
+
 # lemmatize the texts using spacy
 nlp = spacy.load("en_core_web_sm", disable=["parser", "ner", "textcat"])
 nlp.max_length = 10945772 
@@ -92,13 +96,14 @@ def lemmatize_docs(texts):
 # %%
 
 texts = df['text'].dropna().tolist()
+print(len(texts))
 
 # apply lemmatization
 lemmatized = lemmatize_docs(texts)
 
 # %%
 
-# Keep only rows with non-NaN text (matches the 36,896 lemmatized results)
+# Keep only rows with non-NaN text (matches the lemmatized results)
 df = df.dropna(subset=['text']).reset_index(drop=True)
 
 # Now lengths match - assignment will work
