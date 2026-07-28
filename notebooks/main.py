@@ -275,17 +275,6 @@ plt.show()
 
 ### CLASSIFICATION ###
 
-# ============================================================
-# CONFIG
-# ============================================================
-
-# Pick one grouping mode, or loop over all three further down.
-#   "four_class"   -> chicago / fanfics / simplestories / storyscope (all models combined)
-#   "eight_class"         -> chicago / fanfics / simplestories / storyscope_gpt / storyscope_claude / ...
-#   "three_class" -> chicago / fanfics / generated (simplestories + all storyscope models pooled)
-MODE = "three_class"
-
-random_state = 42
 
 # %%
 
@@ -316,12 +305,6 @@ def build_class_groups(mode, datasets):
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
-
-class_groups = build_class_groups(MODE, datasets)
-class_names = sorted(class_groups.keys())
-label_map = {name: i for i, name in enumerate(class_names)}
-print(f"Mode: {MODE}")
-print("Label mapping:", label_map)
 
 # %%
 # ============================================================
@@ -374,7 +357,7 @@ def build_balanced_dataset(class_groups, label_map, sense_cols, random_state, ou
 
 # %%
 # ============================================================
-# Run Cross-validated classification
+# Cross-validated classification
 # ============================================================
 
 def run_classification(together, sense_cols, label_map, random_state=42, n_splits=5):
@@ -562,6 +545,23 @@ def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, ou
 # Build Pipeline
 # ============================================================
 
+# ============================================================
+# CONFIG
+# ============================================================
+
+random_state = 42
+
+# Pick one grouping mode, or loop over all three further down.
+#   "four_class"   -> chicago / fanfics / simplestories / storyscope (all models combined)
+#   "eight_class"         -> chicago / fanfics / simplestories / storyscope_gpt / storyscope_claude / ...
+#   "three_class" -> chicago / fanfics / generated (simplestories + all storyscope models pooled)
+MODE = "three_class"
+
+class_groups = build_class_groups(MODE, datasets)
+class_names = sorted(class_groups.keys())
+label_map = {name: i for i, name in enumerate(class_names)}
+print(f"Mode: {MODE}")
+print("Label mapping:", label_map)
 
 together = build_balanced_dataset(
     class_groups, label_map, sense_cols_prefixed, random_state, OUT_DIR, ts, MODE,
@@ -678,7 +678,7 @@ plot_coefficients(results_raw, sense_cols, USE_WHAT, MODE, ts, FIGS)
 # %%
 
 
-# TESTING HOW WELL NETROPY ALONE DOES
+# TESTING HOW WELL ENTROPY ALONE DOES
 
 X_entropy = together[["sense_entropy"]]
 y = together["label"]
@@ -735,7 +735,6 @@ for c, name in zip(class_labels, class_display_names):
 cm = confusion_matrix(all_y_true, all_y_pred, labels=class_labels)
 print("\nConfusion matrix:")
 print(cm)
-
 
 # %%
 
