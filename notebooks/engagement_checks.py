@@ -1,5 +1,24 @@
+# %%
+
+import pandas as pd
+from pathlib import Path
+import time
 
 # %%
+
+ts = time.strftime("%Y-%m-%d")
+print(f"Timestamp: {ts}")
+
+CWD = Path(__file__).parent
+DATA_PATH = CWD.parent / "data"
+FIGS = CWD.parent / "figs"
+OUT_DIR = CWD / "OUT_DIR"
+
+chicago = pd.read_json('chicago.json')
+fanfics = pd.read_json('fanfics.json')
+
+# %%
+
 
 resid_cols = [x for x in df.columns if x.endswith('_resid')]
 

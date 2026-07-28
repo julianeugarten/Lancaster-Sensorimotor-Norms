@@ -138,6 +138,11 @@ for ds in list(datasets.keys()):
     print(f"After filtering: {len(datasets[ds])} (dropped {zero_mask.sum()})")
 
 
+# %%
+
+# save datasets
+datasets['chicago'].to_json(CWD.parent / "data" / f'{ts}_chicago.json', orient='records')
+datasets['fanfics'].to_json(CWD.parent / "data" / f'{ts}_fanfics.json', orient='records')
 
 # %%
 ### SUMMARY STATISTICS / DATASET ###
@@ -189,6 +194,10 @@ summary_df = pd.DataFrame(rows)
 summary_df.to_csv(OUT_DIR / f"{ts}_sense_score_summary.csv", index=False)
 print(f"Saved tidy summary to {OUT_DIR / f'{ts}_sense_score_summary.csv'}")
 
+# %%
+
+# save clean dataframe
+# summary_df.to_csv(CWD.parent / "data" / f"{ts}_cleaned_data.csv")
 
 # %%
 
