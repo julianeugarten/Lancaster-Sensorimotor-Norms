@@ -27,7 +27,6 @@ Lancaster-Sensorimotor-Norms/
 │   ├── main.py                   # Classification, robustness checks, coherence checks, figures
 │   ├── sense_dict.py             # Lancaster norms lookup / sensory scoring utilities
 │   ├── gen_latex.py              # Generates LaTeX tables from saved results JSONs
-│   ├── engagement_checks.py      # Reception/engagement metric analysis (fanfiction appendix)
 │   └── OUT_DIR/                  # Generated results (JSON/txt/figures), gitignored
 ├── resources/                    # Supplementary scripts (e.g. explicitness prediction)
 ├── src/                          # [describe contents]
