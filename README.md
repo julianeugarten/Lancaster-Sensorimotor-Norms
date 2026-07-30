@@ -29,7 +29,7 @@ Lancaster-Sensorimotor-Norms/
 │   ├── gen_latex.py              # Generates LaTeX tables from saved results JSONs
 │   └── OUT_DIR/                  # Generated results (JSON/txt/figures), gitignored
 ├── resources/                    # Supplementary scripts (e.g. explicitness prediction)
-├── src/                          # [describe contents]
+├── src/                          # Lemmatization and scoring of data
 ├── figs/                         # Saved plots
 ├── requirements.txt
 └── README.md
