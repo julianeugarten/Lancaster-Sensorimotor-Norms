@@ -1,0 +1,202 @@
+======================================================================
+BUILD DATASET CHECKPOINT
+Generated: 2026-07-30
+======================================================================
+Loaded chicago: 9089 entries
+Loaded fanfics: 5153 entries
+Loaded fanfics_mia: 14998 entries
+Loaded simplestories: 10000 entries
+Loaded storyscope: 36896 entries
+Loaded testsetstoryscope: 14440 entries
+
+Datasets loaded: ['chicago', 'fanfics', 'fanfics_mia', 'simplestories', 'storyscope', 'testsetstoryscope']
+Added work_id to simplestories (e.g. simplestories_0)
+
+--- Merging testsetstoryscope into storyscope ---
+storyscope before merge: 36896 rows
+testsetstoryscope: 14440 rows
+Columns only in storyscope: set()
+Columns only in testsetstoryscope: {'source'}
+storyscope after merge: 51336 rows (0 duplicate work_ids dropped)
+
+--- Building author labels ---
+model
+gpt         10272
+deepseek    10272
+kimi        10272
+gemini      10261
+claude      10259
+Name: count, dtype: int64
+Columns only in fanfics (AGRL): {'comments_resid', 'relationship', 'maturity_rating', 'category', 'kudos', 'character', 'comment_hits_ratio_resid', 'fandom', 'comments', 'status date', 'language', 'hits', 'hits_resid', 'published', 'kudos_resid', 'log_age', 'additional tags', 'title', 'bookmarks', 'days_since_published', 'status', 'kudos_hits_ratio', 'kudos_hits_ratio_resid', 'comment_hits_ratio'}
+Columns only in fanfics_mia: {'work_author', 'date', 'work_url', 'fandoms', 'work_title'}
+Combined fanfics dataset: 20151 entries ({'AGRL': 5153, 'LOTR': 3000, 'MAG': 3000, 'RPF': 3000, 'HP': 2999, 'PJ': 2999})
+
+--- Splitting storyscope by model ---
+Storyscope model keys: ['storyscope_claude', 'storyscope_deepseek', 'storyscope_gemini', 'storyscope_gpt', 'storyscope_kimi']
+Per-model sizes (untrimmed):
+  storyscope_claude: 10259
+  storyscope_deepseek: 10272
+  storyscope_gemini: 10261
+  storyscope_gpt: 10272
+  storyscope_kimi: 10272
+
+Authors with >10 stories, per source:
+
+simplestories:
+author
+_lighthearted                                  354
+_mystical                                      351
+_surreal                                       348
+_fairy tale-like                               340
+_minimalist                                    337
+_melancholic                                   336
+_action-packed                                 336
+_classic                                       335
+_fable-like                                    334
+_mythological                                  331
+_suspenseful                                   329
+_romantic                                      327
+_lyric                                         323
+_tragic                                        315
+_noir                                          313
+_playful                                       312
+_modern                                        312
+_whimsical                                     308
+_philosophical                                 303
+_adventurous                                   303
+_humorous                                      299
+_epic                                          293
+_heartwarming                                  280
+an academic_epic                                16
+an explorer archetype_classic                   12
+the everyman_philosophical                      11
+an innocent author_action-packed                11
+an academic_mythological                        11
+a rebellious author_suspenseful                 11
+a hurt, ill-intentioned person_mythological     11
+a poet_playful                                  11
+Name: count, dtype: int64
+
+storyscope:
+author
+gpt_Mark Twain                  101
+deepseek_Mark Twain             101
+kimi_Mark Twain                 101
+claude_Mark Twain               101
+gemini_Mark Twain               100
+                               ... 
+claude_Mark W. Tiedemann         11
+claude_KATHERINE ANNE PORTER     11
+claude_A. S. Byatt               11
+claude_Jonathan Lethem           11
+claude_Donald E. Westlake        11
+Name: count, Length: 1298, dtype: int64
+
+storyscope_claude:
+author
+claude_Mark Twain               101
+claude_Louis L'Amour             91
+claude_Langston Hughes           82
+claude_Ambrose Bierce            81
+claude_Harlan Ellison            81
+                               ... 
+claude_Mark W. Tiedemann         11
+claude_KATHERINE ANNE PORTER     11
+claude_A. S. Byatt               11
+claude_Jonathan Lethem           11
+claude_Donald E. Westlake        11
+Name: count, Length: 259, dtype: int64
+
+storyscope_deepseek:
+author
+deepseek_Mark Twain               101
+deepseek_Louis L'Amour             91
+deepseek_Langston Hughes           82
+deepseek_Ambrose Bierce            81
+deepseek_Harlan Ellison            81
+                                 ... 
+deepseek_Mark W. Tiedemann         11
+deepseek_KATHERINE ANNE PORTER     11
+deepseek_A. S. Byatt               11
+deepseek_Jonathan Lethem           11
+deepseek_Donald E. Westlake        11
+Name: count, Length: 260, dtype: int64
+
+storyscope_gemini:
+author
+gemini_Mark Twain               100
+gemini_Louis L'Amour             91
+gemini_Langston Hughes           82
+gemini_Ambrose Bierce            81
+gemini_Harlan Ellison            81
+                               ... 
+gemini_Mark W. Tiedemann         11
+gemini_KATHERINE ANNE PORTER     11
+gemini_A. S. Byatt               11
+gemini_Jonathan Lethem           11
+gemini_Donald E. Westlake        11
+Name: count, Length: 259, dtype: int64
+
+storyscope_gpt:
+author
+gpt_Mark Twain               101
+gpt_Louis L'Amour             91
+gpt_Langston Hughes           82
+gpt_Ambrose Bierce            81
+gpt_Harlan Ellison            81
+                            ... 
+gpt_Mark W. Tiedemann         11
+gpt_KATHERINE ANNE PORTER     11
+gpt_A. S. Byatt               11
+gpt_Jonathan Lethem           11
+gpt_Donald E. Westlake        11
+Name: count, Length: 260, dtype: int64
+
+storyscope_kimi:
+author
+kimi_Mark Twain               101
+kimi_Louis L'Amour             91
+kimi_Langston Hughes           82
+kimi_Ambrose Bierce            81
+kimi_Harlan Ellison            81
+                             ... 
+kimi_Mark W. Tiedemann         11
+kimi_KATHERINE ANNE PORTER     11
+kimi_A. S. Byatt               11
+kimi_Jonathan Lethem           11
+kimi_Donald E. Westlake        11
+Name: count, Length: 260, dtype: int64
+
+--- Adding Chicago metadata ---
+Chicago: 9092 -> 9089 after dropping duplicate work_ids
+
+--- Computing sense entropy ---
+Entropy computed for all datasets.
+
+--- Saving checkpoints ---
+  [scores] chicago                  9089 rows  ->  chicago.json.gz  (4.41 MB)
+  [text]   chicago                  9089 rows  ->  chicago_text.json.gz  (971.34 MB)
+  [scores] fanfics                 20151 rows  ->  fanfics.json.gz  (11.97 MB)
+  [text]   fanfics                 20151 rows  ->  fanfics_text.json.gz  (307.42 MB)
+  [scores] simplestories           10000 rows  ->  simplestories.json.gz  (5.63 MB)
+  [text]   simplestories           10000 rows  ->  simplestories_text.json.gz  (4.31 MB)
+  [scores] storyscope              51336 rows  ->  storyscope.json.gz  (23.69 MB)
+  [text]   storyscope              51336 rows  ->  storyscope_text.json.gz  (478.06 MB)
+  [scores] storyscope_claude       10259 rows  ->  storyscope_claude.json.gz  (4.74 MB)
+  [text]   storyscope_claude       10259 rows  ->  storyscope_claude_text.json.gz  (131.55 MB)
+  [scores] storyscope_deepseek     10272 rows  ->  storyscope_deepseek.json.gz  (4.73 MB)
+  [text]   storyscope_deepseek     10272 rows  ->  storyscope_deepseek_text.json.gz  (63.07 MB)
+  [scores] storyscope_gemini       10261 rows  ->  storyscope_gemini.json.gz  (4.73 MB)
+  [text]   storyscope_gemini       10261 rows  ->  storyscope_gemini_text.json.gz  (63.88 MB)
+  [scores] storyscope_gpt          10272 rows  ->  storyscope_gpt.json.gz  (4.75 MB)
+  [text]   storyscope_gpt          10272 rows  ->  storyscope_gpt_text.json.gz  (149.83 MB)
+  [scores] storyscope_kimi         10272 rows  ->  storyscope_kimi.json.gz  (4.74 MB)
+  [text]   storyscope_kimi         10272 rows  ->  storyscope_kimi_text.json.gz  (69.73 MB)
+
+Scores checkpoint total: 69.4 MB  (this is what goes to GitHub)
+Text checkpoint total:   2239.2 MB  (local only -- do not commit)
+Saved checkpoint config to checkpoint_config.json
+
+======================================================================
+DONE
+======================================================================

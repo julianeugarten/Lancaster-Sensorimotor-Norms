@@ -1,0 +1,144 @@
+Group: chicago
+--------------
+  N texts: 9089
+  N unique authors: 3153
+  coverage        mean=0.822  sd=0.046
+  n_tokens        mean=40328.804  sd=22771.525
+  msttr_lemmas    mean=0.828  sd=0.038
+  unique_vs_all   mean=0.170  sd=0.052
+  auditory         mean=1.687  sd=0.091   entropy corr: rho=+0.192 p=2.55e-76
+  gustatory        mean=0.381  sd=0.043   entropy corr: rho=+0.926 p=0
+  olfactory        mean=0.513  sd=0.051   entropy corr: rho=+0.798 p=0
+  haptic           mean=1.401  sd=0.118   entropy corr: rho=+0.125 p=9.49e-33
+  visual           mean=3.111  sd=0.091   entropy corr: rho=-0.162 p=3.56e-54
+  interoceptive    mean=1.322  sd=0.094   entropy corr: rho=+0.556 p=0
+  sense_entropy    mean=2.291  sd=0.023
+============================================================
+Group: fanfics
+--------------
+  N texts: 20082
+  N unique authors: 12321
+  coverage        mean=0.949  sd=0.035
+  n_tokens        mean=7794.854  sd=26706.520
+  msttr_lemmas    mean=0.682  sd=0.031
+  unique_vs_all   mean=0.287  sd=0.128
+  auditory         mean=1.683  sd=0.086   entropy corr: rho=+0.340 p=0
+  gustatory        mean=0.424  sd=0.046   entropy corr: rho=+0.911 p=0
+  olfactory        mean=0.543  sd=0.048   entropy corr: rho=+0.826 p=0
+  haptic           mean=1.180  sd=0.104   entropy corr: rho=+0.199 p=5.25e-179
+  visual           mean=2.519  sd=0.102   entropy corr: rho=-0.366 p=0
+  interoceptive    mean=1.249  sd=0.122   entropy corr: rho=+0.700 p=0
+  sense_entropy    mean=2.356  sd=0.029
+============================================================
+Group: simplestories
+--------------------
+  N texts: 10000
+  N unique authors: 546
+  coverage        mean=0.982  sd=0.019
+  n_tokens        mean=226.212  sd=103.957
+  msttr_lemmas    mean=0.678  sd=0.036
+  unique_vs_all   mean=0.563  sd=0.083
+  auditory         mean=1.734  sd=0.116   entropy corr: rho=+0.059 p=4.76e-09
+  gustatory        mean=0.405  sd=0.072   entropy corr: rho=+0.886 p=0
+  olfactory        mean=0.537  sd=0.077   entropy corr: rho=+0.828 p=0
+  haptic           mean=1.181  sd=0.117   entropy corr: rho=+0.513 p=0
+  visual           mean=2.690  sd=0.114   entropy corr: rho=-0.162 p=4.24e-60
+  interoceptive    mean=1.179  sd=0.119   entropy corr: rho=+0.492 p=0
+  sense_entropy    mean=2.327  sd=0.035
+============================================================
+Group: storyscope
+-----------------
+  N texts: 51324
+  N unique authors: 15226
+  coverage        mean=0.965  sd=0.017
+  n_tokens        mean=4483.676  sd=3412.958
+  msttr_lemmas    mean=0.704  sd=0.042
+  unique_vs_all   mean=0.280  sd=0.081
+  auditory         mean=1.639  sd=0.072   entropy corr: rho=+0.212 p=0
+  gustatory        mean=0.414  sd=0.041   entropy corr: rho=+0.934 p=0
+  olfactory        mean=0.533  sd=0.043   entropy corr: rho=+0.867 p=0
+  haptic           mean=1.160  sd=0.077   entropy corr: rho=+0.191 p=0
+  visual           mean=2.555  sd=0.080   entropy corr: rho=-0.486 p=0
+  interoceptive    mean=1.112  sd=0.086   entropy corr: rho=+0.727 p=0
+  sense_entropy    mean=2.343  sd=0.025
+============================================================
+Group: storyscope_claude
+------------------------
+  N texts: 10259
+  N unique authors: 3043
+  coverage        mean=0.971  sd=0.013
+  n_tokens        mean=6687.708  sd=5112.757
+  msttr_lemmas    mean=0.656  sd=0.029
+  unique_vs_all   mean=0.202  sd=0.087
+  auditory         mean=1.685  sd=0.062   entropy corr: rho=+0.232 p=8.67e-126
+  gustatory        mean=0.449  sd=0.035   entropy corr: rho=+0.934 p=0
+  olfactory        mean=0.560  sd=0.038   entropy corr: rho=+0.865 p=0
+  haptic           mean=1.118  sd=0.060   entropy corr: rho=+0.314 p=2.41e-233
+  visual           mean=2.480  sd=0.066   entropy corr: rho=-0.453 p=0
+  interoceptive    mean=1.140  sd=0.084   entropy corr: rho=+0.786 p=0
+  sense_entropy    mean=2.364  sd=0.020
+============================================================
+Group: storyscope_deepseek
+--------------------------
+  N texts: 10260
+  N unique authors: 3042
+  coverage        mean=0.961  sd=0.021
+  n_tokens        mean=2872.297  sd=1599.121
+  msttr_lemmas    mean=0.709  sd=0.030
+  unique_vs_all   mean=0.333  sd=0.061
+  auditory         mean=1.656  sd=0.068   entropy corr: rho=+0.093 p=5.17e-21
+  gustatory        mean=0.406  sd=0.039   entropy corr: rho=+0.915 p=0
+  olfactory        mean=0.522  sd=0.042   entropy corr: rho=+0.830 p=0
+  haptic           mean=1.154  sd=0.078   entropy corr: rho=+0.386 p=0
+  visual           mean=2.580  sd=0.076   entropy corr: rho=-0.283 p=6.37e-188
+  interoceptive    mean=1.099  sd=0.082   entropy corr: rho=+0.706 p=0
+  sense_entropy    mean=2.335  sd=0.027
+============================================================
+Group: storyscope_gemini
+------------------------
+  N texts: 10261
+  N unique authors: 3047
+  coverage        mean=0.962  sd=0.017
+  n_tokens        mean=3079.301  sd=1077.290
+  msttr_lemmas    mean=0.684  sd=0.018
+  unique_vs_all   mean=0.295  sd=0.051
+  auditory         mean=1.603  sd=0.059   entropy corr: rho=+0.110 p=3.95e-29
+  gustatory        mean=0.408  sd=0.036   entropy corr: rho=+0.921 p=0
+  olfactory        mean=0.535  sd=0.038   entropy corr: rho=+0.834 p=0
+  haptic           mean=1.177  sd=0.072   entropy corr: rho=+0.355 p=5.08e-303
+  visual           mean=2.554  sd=0.065   entropy corr: rho=-0.323 p=3.67e-248
+  interoceptive    mean=1.099  sd=0.083   entropy corr: rho=+0.773 p=0
+  sense_entropy    mean=2.344  sd=0.021
+============================================================
+Group: storyscope_gpt
+---------------------
+  N texts: 10272
+  N unique authors: 3047
+  coverage        mean=0.969  sd=0.015
+  n_tokens        mean=6571.406  sd=3190.217
+  msttr_lemmas    mean=0.759  sd=0.020
+  unique_vs_all   mean=0.261  sd=0.063
+  auditory         mean=1.651  sd=0.061   entropy corr: rho=+0.252 p=1.6e-148
+  gustatory        mean=0.395  sd=0.033   entropy corr: rho=+0.937 p=0
+  olfactory        mean=0.513  sd=0.036   entropy corr: rho=+0.866 p=0
+  haptic           mean=1.149  sd=0.067   entropy corr: rho=+0.273 p=3.76e-175
+  visual           mean=2.578  sd=0.066   entropy corr: rho=-0.459 p=0
+  interoceptive    mean=1.107  sd=0.080   entropy corr: rho=+0.783 p=0
+  sense_entropy    mean=2.332  sd=0.022
+============================================================
+Group: storyscope_kimi
+----------------------
+  N texts: 10272
+  N unique authors: 3047
+  coverage        mean=0.961  sd=0.018
+  n_tokens        mean=3207.069  sd=1673.864
+  msttr_lemmas    mean=0.710  sd=0.023
+  unique_vs_all   mean=0.311  sd=0.067
+  auditory         mean=1.598  sd=0.068   entropy corr: rho=+0.180 p=1.11e-75
+  gustatory        mean=0.409  sd=0.041   entropy corr: rho=+0.915 p=0
+  olfactory        mean=0.536  sd=0.043   entropy corr: rho=+0.830 p=0
+  haptic           mean=1.201  sd=0.081   entropy corr: rho=+0.342 p=1.67e-279
+  visual           mean=2.582  sd=0.073   entropy corr: rho=-0.303 p=8.67e-218
+  interoceptive    mean=1.113  sd=0.095   entropy corr: rho=+0.753 p=0
+  sense_entropy    mean=2.343  sd=0.023
+============================================================

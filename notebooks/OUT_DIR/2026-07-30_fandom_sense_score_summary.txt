@@ -1,0 +1,96 @@
+Group: AGRL
+-----------
+  N texts: 5084
+  N unique authors: 2562
+  coverage        mean=0.951  sd=0.051
+  n_tokens        mean=5615.793  sd=33636.619
+  msttr_lemmas    mean=0.679  sd=0.039
+  unique_vs_all   mean=0.345  sd=0.158
+  auditory         mean=1.683  sd=0.109   entropy corr: rho=+0.289 p=2.81e-98
+  gustatory        mean=0.426  sd=0.057   entropy corr: rho=+0.893 p=0
+  olfactory        mean=0.550  sd=0.061   entropy corr: rho=+0.808 p=0
+  haptic           mean=1.186  sd=0.126   entropy corr: rho=+0.252 p=2.16e-74
+  visual           mean=2.528  sd=0.136   entropy corr: rho=-0.326 p=2.35e-126
+  interoceptive    mean=1.248  sd=0.148   entropy corr: rho=+0.700 p=0
+  sense_entropy    mean=2.356  sd=0.042
+============================================================
+Group: HP
+---------
+  N texts: 2999
+  N unique authors: 2550
+  coverage        mean=0.943  sd=0.027
+  n_tokens        mean=13151.786  sd=33251.758
+  msttr_lemmas    mean=0.686  sd=0.026
+  unique_vs_all   mean=0.241  sd=0.106
+  auditory         mean=1.684  sd=0.068   entropy corr: rho=+0.406 p=2.78e-119
+  gustatory        mean=0.426  sd=0.038   entropy corr: rho=+0.916 p=0
+  olfactory        mean=0.548  sd=0.040   entropy corr: rho=+0.830 p=0
+  haptic           mean=1.186  sd=0.095   entropy corr: rho=+0.164 p=1.63e-19
+  visual           mean=2.535  sd=0.082   entropy corr: rho=-0.382 p=1.41e-104
+  interoceptive    mean=1.248  sd=0.103   entropy corr: rho=+0.735 p=0
+  sense_entropy    mean=2.357  sd=0.020
+============================================================
+Group: LOTR
+-----------
+  N texts: 3000
+  N unique authors: 1663
+  coverage        mean=0.945  sd=0.024
+  n_tokens        mean=11884.599  sd=31457.898
+  msttr_lemmas    mean=0.688  sd=0.027
+  unique_vs_all   mean=0.258  sd=0.108
+  auditory         mean=1.663  sd=0.069   entropy corr: rho=+0.307 p=1.89e-66
+  gustatory        mean=0.408  sd=0.040   entropy corr: rho=+0.910 p=0
+  olfactory        mean=0.524  sd=0.040   entropy corr: rho=+0.828 p=0
+  haptic           mean=1.140  sd=0.096   entropy corr: rho=+0.285 p=5.19e-57
+  visual           mean=2.486  sd=0.085   entropy corr: rho=-0.308 p=9.8e-67
+  interoceptive    mean=1.215  sd=0.108   entropy corr: rho=+0.698 p=0
+  sense_entropy    mean=2.350  sd=0.022
+============================================================
+Group: MAG
+----------
+  N texts: 3000
+  N unique authors: 1668
+  coverage        mean=0.959  sd=0.020
+  n_tokens        mean=6715.069  sd=17666.934
+  msttr_lemmas    mean=0.681  sd=0.029
+  unique_vs_all   mean=0.263  sd=0.090
+  auditory         mean=1.679  sd=0.079   entropy corr: rho=+0.344 p=4.01e-84
+  gustatory        mean=0.432  sd=0.038   entropy corr: rho=+0.923 p=0
+  olfactory        mean=0.544  sd=0.039   entropy corr: rho=+0.854 p=0
+  haptic           mean=1.186  sd=0.086   entropy corr: rho=+0.041 p=0.0235
+  visual           mean=2.493  sd=0.076   entropy corr: rho=-0.481 p=3.61e-173
+  interoceptive    mean=1.255  sd=0.098   entropy corr: rho=+0.684 p=0
+  sense_entropy    mean=2.363  sd=0.021
+============================================================
+Group: PJ
+---------
+  N texts: 2999
+  N unique authors: 1891
+  coverage        mean=0.945  sd=0.025
+  n_tokens        mean=8631.456  sd=18935.664
+  msttr_lemmas    mean=0.682  sd=0.025
+  unique_vs_all   mean=0.251  sd=0.099
+  auditory         mean=1.703  sd=0.065   entropy corr: rho=+0.385 p=1.7e-106
+  gustatory        mean=0.429  sd=0.037   entropy corr: rho=+0.916 p=0
+  olfactory        mean=0.550  sd=0.038   entropy corr: rho=+0.847 p=0
+  haptic           mean=1.183  sd=0.082   entropy corr: rho=+0.153 p=3.61e-17
+  visual           mean=2.533  sd=0.080   entropy corr: rho=-0.461 p=1.36e-157
+  interoceptive    mean=1.280  sd=0.108   entropy corr: rho=+0.694 p=0
+  sense_entropy    mean=2.359  sd=0.020
+============================================================
+Group: RPF
+----------
+  N texts: 3000
+  N unique authors: 2214
+  coverage        mean=0.948  sd=0.036
+  n_tokens        mean=2286.208  sd=2637.358
+  msttr_lemmas    mean=0.676  sd=0.033
+  unique_vs_all   mean=0.325  sd=0.118
+  auditory         mean=1.687  sd=0.089   entropy corr: rho=+0.332 p=4.18e-78
+  gustatory        mean=0.420  sd=0.048   entropy corr: rho=+0.924 p=0
+  olfactory        mean=0.538  sd=0.049   entropy corr: rho=+0.852 p=0
+  haptic           mean=1.192  sd=0.105   entropy corr: rho=+0.149 p=2.62e-16
+  visual           mean=2.535  sd=0.096   entropy corr: rho=-0.428 p=5.06e-134
+  interoceptive    mean=1.248  sd=0.130   entropy corr: rho=+0.688 p=0
+  sense_entropy    mean=2.353  sd=0.030
+============================================================

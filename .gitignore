@@ -7,3 +7,4 @@ notebooks/OUT_DIR/three_regime_classification_dataset.csv.gz
 notebooks/engagement_checks.py
 notebooks/results.md
 notebooks/test.ipynb
+data/checkpoint/text_local/

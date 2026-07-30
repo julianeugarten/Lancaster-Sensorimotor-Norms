@@ -29,20 +29,46 @@ ts = time.strftime("%Y-%m-%d")
 print(f"Timestamp: {ts}")
 
 CWD = Path(__file__).parent
-#DATA_PATH = CWD.parent / "data" / "lemmatized_data" / "scored_data"
 DATA_PATH = CWD.parent / "data" / "checkpoint"
 FIGS = CWD.parent / "figs"
 OUT_DIR = CWD / "OUT_DIR"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
+# %%
+### Load checkpoint (scores always; lemmatized text only if available locally) ###
+
+SCORES_DIR = DATA_PATH / "scores"
+TEXT_DIR = DATA_PATH / "text_local"
+
+config = json.loads((DATA_PATH / "checkpoint_config.json").read_text())
+sense_cols = config["sense_cols"]
+USE_WHAT = config["USE_WHAT"]
+sense_cols_prefixed = config["sense_cols_prefixed"]
+storyscope_keys = config["storyscope_keys"]
+
+HAS_TEXT = TEXT_DIR.exists() and any(TEXT_DIR.glob("*.json.gz"))
+print(f"Text checkpoint available: {HAS_TEXT}")
+
+datasets = {}
+for path in sorted(SCORES_DIR.glob("*.json.gz")):
+    name = path.stem.replace(".json", "")
+    d = pd.read_json(path, orient="records", lines=True, compression="gzip")
+
+    if HAS_TEXT:
+        text_path = TEXT_DIR / f"{name}_text.json.gz"
+        if text_path.exists():
+            text_df = pd.read_json(text_path, orient="records", lines=True, compression="gzip")
+            text_df["lemmatized_text"] = text_df["lemmatized_text"].str.split(" ")
+            d = d.merge(text_df, on="work_id", how="left")
+
+    datasets[name] = d
+    print(f"Loaded {name}: {len(datasets[name])} rows"f"{' (with text)' if 'lemmatized_text' in d.columns else ''}")
 
 # %%
 
+### REMOVE VECTOR IF 0 ACROSS ALL VALUES IN SENSE VECTOR ####
 
-### REMOVE 0 IF ACROSS ALL FEATS ####
-
-# check before filtering
 # drop rows with zero total sense score (degenerate/near-empty texts)
 for ds in list(datasets.keys()):
     zero_mask = datasets[ds][sense_cols_prefixed].sum(axis=1) == 0
@@ -228,12 +254,9 @@ def build_class_groups(mode, datasets):
 
 
 # %%
-# ============================================================
-# Assemble balanced dataset
-# ============================================================
 
 # ============================================================
-# Assemble balanced dataset (now with optional stratified sampling)
+# Assemble balanced dataset (with optional stratified sampling)
 # ============================================================
 
 def stratified_sample(df, n, stratify_col, random_state):
@@ -415,8 +438,7 @@ def run_classification(together, sense_cols, label_map, random_state=42, n_split
 # Structured output: per-fold metrics, per-class metrics, coefficients
 # ============================================================
 
-
-def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, out_dir, figs_dir, use_what, print_top_n=None):
+def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, out_dir, figs_dir, use_what, print_top_n=None, save_csvs=False):
     class_labels = results_raw["class_labels"]
     class_display_names = results_raw["class_display_names"]
     scores = results_raw["scores"]
@@ -448,7 +470,7 @@ def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, ou
     plt.savefig(figs_dir / f"{ts}_{mode}_confusion_matrix.png")
     plt.show()
 
-    # structured JSON
+    # structured JSON (always saved -- this is the canonical record)
     results = {
         "timestamp": ts,
         "dataset_config": mode,
@@ -491,37 +513,36 @@ def save_classification_outputs(results_raw, label_map, sense_cols, mode, ts, ou
     results_path.write_text(json.dumps(results, indent=2))
     print(f"Saved structured results to {results_path}")
 
-    # tidy per-class CSV
-    per_class_df = pd.DataFrame([
-        {
-            "class_label": c, "class_name": name, "metric": m,
-            "mean": np.mean(per_class_scores[f"{c}_{m}"]),
-            "std": np.std(per_class_scores[f"{c}_{m}"]),
-        }
-        for c, name in zip(class_labels, class_display_names)
-        for m in ["precision", "recall", "f1"]
-    ])
-    per_class_df.to_csv(out_dir / f"{ts}_{mode}_per_class_metrics.csv", index=False)
+    # CSVs: optional, built only when requested
+    if save_csvs:
+        per_class_df = pd.DataFrame([
+            {
+                "class_label": c, "class_name": name, "metric": m,
+                "mean": np.mean(per_class_scores[f"{c}_{m}"]),
+                "std": np.std(per_class_scores[f"{c}_{m}"]),
+            }
+            for c, name in zip(class_labels, class_display_names)
+            for m in ["precision", "recall", "f1"]
+        ])
+        per_class_df.to_csv(out_dir / f"{ts}_{mode}_per_class_metrics.csv", index=False)
 
-    # tidy coefficients CSV
-    coef_df = pd.DataFrame([
-        {
-            "class_name": name,
-            "sense": feat.replace(use_what, "").replace(".mean", ""),
-            "coef_mean": coef_array[:, idx, fi].mean(),
-            "coef_std": coef_array[:, idx, fi].std(),
-        }
-        for idx, name in enumerate(class_display_names)
-        for fi, feat in enumerate(sense_cols)
-    ])
-    coef_df.to_csv(out_dir / f"{ts}_{mode}_coefficients.csv", index=False)
-    print(f"Saved per-class metrics and coefficients CSVs for mode={mode}")
+        coef_df = pd.DataFrame([
+            {
+                "class_name": name,
+                "sense": feat.replace(use_what, "").replace(".mean", ""),
+                "coef_mean": coef_array[:, idx, fi].mean(),
+                "coef_std": coef_array[:, idx, fi].std(),
+            }
+            for idx, name in enumerate(class_display_names)
+            for fi, feat in enumerate(sense_cols)
+        ])
+        coef_df.to_csv(out_dir / f"{ts}_{mode}_coefficients.csv", index=False)
 
+        print(f"Saved per-class metrics and coefficients CSVs for mode={mode}")
 
 # %%
 # ============================================================
-# Build Pipeline
-# ============================================================
+# Run Pipeline
 
 # ============================================================
 # CONFIG
@@ -531,9 +552,8 @@ random_state = 42
 
 # Pick one grouping mode, or loop over all three further down.
 #   "four_class"   -> chicago / fanfics / simplestories / storyscope (all models combined)
-#   "eight_class"         -> chicago / fanfics / simplestories / storyscope_gpt / storyscope_claude / ...
 #   "three_class" -> chicago / fanfics / generated (simplestories + all storyscope models pooled)
-MODE = "four_class"
+MODE = "three_class"
 
 class_groups = build_class_groups(MODE, datasets)
 class_names = sorted(class_groups.keys())
@@ -543,58 +563,61 @@ print("Label mapping:", label_map)
 
 together = build_balanced_dataset(
     class_groups, label_map, sense_cols_prefixed, random_state, OUT_DIR, ts, MODE,
-    extra_cols=["lemmatized_text"],
+    extra_cols=["lemmatized_text"] if HAS_TEXT else None,
     stratify_cols={"fanfics": "fandom_label", "generated": "source", "storyscope": "model"})
-    
+
 results_raw = run_classification(together, sense_cols_prefixed, label_map, random_state=random_state)
 save_classification_outputs(results_raw, label_map, sense_cols_prefixed, MODE, ts, OUT_DIR, FIGS, USE_WHAT)
 
 
+
 # %%
 # ============================================================
-# Build MFW features x 2 and run pipeline
+# Build MFW features x 2 and run pipeline (only if lemmatized text is available)
 # ============================================================
 
-def build_mfw_features(together, text_col="lemmatized_text", n_features=100, relative=True):
-    """
-    Builds top-N most-frequent-word features from a column of tokenized/lemmatized text
-    (list of tokens per row). Vocabulary is selected on the whole corpus, unsupervised
-    (no label information used), consistent with standard stylometric MFW practice.
-    """
-    vectorizer = CountVectorizer(max_features=n_features, analyzer=lambda tokens: tokens, lowercase=False)
-    X_counts = vectorizer.fit_transform(together[text_col])
-    feature_names = [f"mfw_{w}" for w in vectorizer.get_feature_names_out()]
+if not HAS_TEXT:
+    print("Skipping MFW baselines: 'lemmatized_text' not available "
+          "(text checkpoint not found -- run the build script locally with text output "
+          "to enable this section).")
+else:
+    def build_mfw_features(together, text_col="lemmatized_text", n_features=100, relative=True):
+        """
+        Builds top-N most-frequent-word features from a column of tokenized/lemmatized text
+        (list of tokens per row). Vocabulary is selected on the whole corpus, unsupervised
+        (no label information used), consistent with standard stylometric MFW practice.
+        """
+        vectorizer = CountVectorizer(max_features=n_features, analyzer=lambda tokens: tokens, lowercase=False)
+        X_counts = vectorizer.fit_transform(together[text_col])
+        feature_names = [f"mfw_{w}" for w in vectorizer.get_feature_names_out()]
 
-    X_df = pd.DataFrame(X_counts.toarray(), columns=feature_names, index=together.index)
+        X_df = pd.DataFrame(X_counts.toarray(), columns=feature_names, index=together.index)
 
-    if relative:
-        # normalize by text length so longer texts don't just have larger raw counts
-        text_lengths = together[text_col].apply(len).replace(0, np.nan)
-        X_df = X_df.div(text_lengths, axis=0).fillna(0)
+        if relative:
+            text_lengths = together[text_col].apply(len).replace(0, np.nan)
+            X_df = X_df.div(text_lengths, axis=0).fillna(0)
 
-    print(f"Built {len(feature_names)} MFW features (relative={relative})")
-    print(f"Top 10 words: {[f.replace('mfw_', '') for f in feature_names[:10]]}")
+        print(f"Built {len(feature_names)} MFW features (relative={relative})")
+        print(f"Top 10 words: {[f.replace('mfw_', '') for f in feature_names[:10]]}")
 
-    return X_df, feature_names
-
-
-mfw_df, mfw_cols = build_mfw_features(together, n_features=100, relative=True)
-together_mfw = pd.concat([together.drop(columns=["lemmatized_text"]), mfw_df], axis=1)
-
-
-results_raw_mfw = run_classification(together_mfw, mfw_cols, label_map, random_state=random_state)
-save_classification_outputs(
-    results_raw_mfw, label_map, mfw_cols, mode=f"{MODE}_mfw100",
-    ts=ts, out_dir=OUT_DIR, figs_dir=FIGS, use_what="mfw_")
+        return X_df, feature_names
 
 
-mfw6_df, mfw6_cols = build_mfw_features(together, n_features=6, relative=True)
-together_mfw6 = pd.concat([together.drop(columns=["lemmatized_text"]), mfw6_df], axis=1)
+    mfw_df, mfw_cols = build_mfw_features(together, n_features=100, relative=True)
+    together_mfw = pd.concat([together.drop(columns=["lemmatized_text"]), mfw_df], axis=1)
 
-results_raw_mfw6 = run_classification(together_mfw6, mfw6_cols, label_map, random_state=random_state)
-save_classification_outputs(
-    results_raw_mfw6, label_map, mfw6_cols, mode=f"{MODE}_mfw6",
-    ts=ts, out_dir=OUT_DIR, figs_dir=FIGS, use_what="mfw_")
+    results_raw_mfw = run_classification(together_mfw, mfw_cols, label_map, random_state=random_state)
+    save_classification_outputs(
+        results_raw_mfw, label_map, mfw_cols, mode=f"{MODE}_mfw100",
+        ts=ts, out_dir=OUT_DIR, figs_dir=FIGS, use_what="mfw_")
+
+    mfw6_df, mfw6_cols = build_mfw_features(together, n_features=6, relative=True)
+    together_mfw6 = pd.concat([together.drop(columns=["lemmatized_text"]), mfw6_df], axis=1)
+
+    results_raw_mfw6 = run_classification(together_mfw6, mfw6_cols, label_map, random_state=random_state)
+    save_classification_outputs(
+        results_raw_mfw6, label_map, mfw6_cols, mode=f"{MODE}_mfw6",
+        ts=ts, out_dir=OUT_DIR, figs_dir=FIGS, use_what="mfw_")
 
 # %%
 

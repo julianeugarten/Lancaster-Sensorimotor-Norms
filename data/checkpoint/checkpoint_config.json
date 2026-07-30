@@ -1,0 +1,26 @@
+{
+  "sense_cols": [
+    "auditory.mean",
+    "gustatory.mean",
+    "olfactory.mean",
+    "haptic.mean",
+    "visual.mean",
+    "interoceptive.mean"
+  ],
+  "USE_WHAT": "avg_matched_",
+  "sense_cols_prefixed": [
+    "avg_matched_auditory.mean",
+    "avg_matched_gustatory.mean",
+    "avg_matched_olfactory.mean",
+    "avg_matched_haptic.mean",
+    "avg_matched_visual.mean",
+    "avg_matched_interoceptive.mean"
+  ],
+  "storyscope_keys": [
+    "storyscope_claude",
+    "storyscope_deepseek",
+    "storyscope_gemini",
+    "storyscope_gpt",
+    "storyscope_kimi"
+  ]
+}

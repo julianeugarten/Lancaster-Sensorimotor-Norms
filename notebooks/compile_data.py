@@ -45,6 +45,14 @@ for path in sorted(Path(DATA_PATH).glob("*.json")):
 log(f"\nDatasets loaded: {sorted(datasets.keys())}")
 
 # %%
+
+### Give SimpleStories a work_id (it doesn't have one natively) ###
+
+if "work_id" not in datasets["simplestories"].columns:
+    datasets["simplestories"] = datasets["simplestories"].reset_index(drop=True)
+    datasets["simplestories"]["work_id"] = "simplestories_" + datasets["simplestories"].index.astype(str)
+    log(f"Added work_id to simplestories (e.g. {datasets['simplestories']['work_id'].iloc[0]})")
+
 ### Merge extra Storyscope validation/test rows into the main storyscope dataset ###
 
 if "testsetstoryscope" in datasets:
@@ -131,9 +139,11 @@ for key in ["simplestories", "storyscope", *storyscope_keys]:
 
 log(f"\n--- Adding Chicago metadata ---")
 
+datasets["chicago"] = datasets["chicago"].drop(columns=["text"])
+
 meta = pd.read_excel(CWD.parent / "data" / "meta" / "CHICAGO_MEASURES_MARCH24.xlsx")
-meta = meta[["BOOK_ID", "AUTH_FIRST", "AUTH_LAST", "WORDCOUNT", "PUBL_DATE", "LIBRARIES", "RATING_COUNT"]]
-meta.columns = ["work_id", "author_first", "author_last", "text_length", "year", "libraries", "rating_count"]
+meta = meta[["BOOK_ID", "AUTH_FIRST", "AUTH_LAST", "WORDCOUNT", "PUBL_DATE"]]
+meta.columns = ["work_id", "author_first", "author_last", "text_length", "year"]
 meta["author"] = meta["author_first"] + " " + meta["author_last"]
 meta.drop(columns=["author_first", "author_last"], inplace=True)
 
@@ -179,35 +189,52 @@ for name, df in datasets.items():
 
 log("Entropy computed for all datasets.")
 
+
 # %%
-### Save checkpoint ###
+### Save checkpoint: split into a small "scores" checkpoint (git-friendly) ###
+### and a large "text" checkpoint (kept local only, not committed) ###
 
-log(f"\n--- Saving checkpoint ---")
+log(f"\n--- Saving checkpoints ---")
 
-total_bytes = 0
+SCORES_DIR = CHECKPOINT_DIR / "scores"
+TEXT_DIR = CHECKPOINT_DIR / "text_local"  # not committed to git
+SCORES_DIR.mkdir(parents=True, exist_ok=True)
+TEXT_DIR.mkdir(parents=True, exist_ok=True)
+
+total_scores_bytes = 0
+total_text_bytes = 0
+
 for name, df in datasets.items():
-    d = df.copy()
+    has_text = "lemmatized_text" in df.columns
 
-    # join lemmatized_text into one string per row before serializing --
-    # writing thousands of individually-quoted token strings per row is the
-    # main cost; one joined string per row serializes much faster
-    if "lemmatized_text" in d.columns:
-        d["lemmatized_text"] = d["lemmatized_text"].apply(lambda toks: " ".join(toks) if isinstance(toks, list) else toks)
-
-    path = CHECKPOINT_DIR / f"{name}.json.gz"
-    d.to_json(
-        path, orient="records", lines=True, force_ascii=False,
-        compression={"method": "gzip", "compresslevel": 1},  # fast, slightly larger files
+    # --- scores checkpoint: everything except the raw token lists ---
+    scores_df = df.drop(columns=["lemmatized_text"]) if has_text else df
+    scores_path = SCORES_DIR / f"{name}.json.gz"
+    scores_df.to_json(
+        scores_path, orient="records", lines=True, force_ascii=False,
+        compression={"method": "gzip", "compresslevel": 1},
     )
-    size_mb = path.stat().st_size / (1024 * 1024)
-    total_bytes += path.stat().st_size
-    log(f"  {name:20s}  {len(d):>7} rows  ->  {path.name}  ({size_mb:.1f} MB)")
+    size_mb = scores_path.stat().st_size / (1024 * 1024)
+    total_scores_bytes += scores_path.stat().st_size
+    log(f"  [scores] {name:20s}  {len(scores_df):>7} rows  ->  {scores_path.name}  ({size_mb:.2f} MB)")
 
-total_mb = total_bytes / (1024 * 1024)
-log(f"\nTotal checkpoint size: {total_mb:.1f} MB")
-if total_mb > 90:
-    log("WARNING: approaching GitHub's ~100MB per-file limit / repo-bloat concerns. "
-        "Consider dropping 'lemmatized_text' from the checkpoint, or using Git LFS.")
+    # --- text checkpoint: work_id + lemmatized_text only, for re-joining later ---
+    if has_text:
+        text_df = df[["work_id", "lemmatized_text"]].copy()
+        text_df["lemmatized_text"] = text_df["lemmatized_text"].apply(
+            lambda toks: " ".join(toks) if isinstance(toks, list) else toks
+        )
+        text_path = TEXT_DIR / f"{name}_text.json.gz"
+        text_df.to_json(
+            text_path, orient="records", lines=True, force_ascii=False,
+            compression={"method": "gzip", "compresslevel": 1},
+        )
+        size_mb = text_path.stat().st_size / (1024 * 1024)
+        total_text_bytes += text_path.stat().st_size
+        log(f"  [text]   {name:20s}  {len(text_df):>7} rows  ->  {text_path.name}  ({size_mb:.2f} MB)")
+
+log(f"\nScores checkpoint total: {total_scores_bytes / (1024*1024):.1f} MB  (this is what goes to GitHub)")
+log(f"Text checkpoint total:   {total_text_bytes / (1024*1024):.1f} MB  (local only -- do not commit)")
 
 config = {"sense_cols": sense_cols, "USE_WHAT": USE_WHAT, "sense_cols_prefixed": sense_cols_prefixed,
           "storyscope_keys": storyscope_keys}
