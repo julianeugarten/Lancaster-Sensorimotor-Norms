@@ -21,7 +21,7 @@ Lancaster-Sensorimotor-Norms/
 │   ├── checkpoint/
 │   │   ├── scores/               # Compact per-corpus sensory scores + metadata (git-tracked, ~70MB)
 │   │   └── text_local/           # Full lemmatized token lists per corpus (large, gitignored, local only)
-│   └── data_subset_chr27.csv     # Raw fanfiction source data — not included, see below
+│   └── fanfiction_set_m.csv     # Raw fanfiction source data — not included, see below
 ├── notebooks/
 │   ├── compile_data.py           # Loads, merges, and labels raw scored data; saves the checkpoint above
 │   ├── main.py                   # Classification, robustness checks, coherence checks, figures
