@@ -1,0 +1,19 @@
+Balanced dataset stats:
+label
+0    9089
+1    9089
+2    9089
+Name: count, dtype: int64
+Number of unique authors: 13867
+N unique authors per label: label
+0    3156
+1    6421
+2    4290
+Name: author, dtype: int64
+Avg number of samples per author: 1.97
+Avg textlength per label: label
+0    40328.803609
+1     7658.863131
+2     3559.814721
+Name: n_tokens, dtype: float64
+==========

@@ -1,0 +1,43 @@
+======================================================================
+EFFECT SIZES: BETWEEN-CORPUS DIFFERENCES
+Generated: 2026-07-29
+======================================================================
+
+--- 1. Cohen's d: Chicago vs Fanfiction, per sense ---
+
+auditory         d=+0.046
+gustatory        d=-0.939
+olfactory        d=-0.611
+haptic           d=+2.045
+visual           d=+5.998
+interoceptive    d=+0.644
+
+--- 2. Cohen's d: Chicago vs Generated (pooled), per sense ---
+
+auditory         d=+0.372
+gustatory        d=-0.658
+olfactory        d=-0.406
+haptic           d=+2.641
+visual           d=+5.425
+interoceptive    d=+2.088
+
+--- 3. Cohen's d: Fanfiction vs Generated (pooled), per sense ---
+
+auditory         d=+0.331
+gustatory        d=+0.242
+olfactory        d=+0.193
+haptic           d=+0.182
+visual           d=-0.576
+interoceptive    d=+1.226
+
+--- 4. Levene's test: Chicago vs Storyscope (combined), per sense ---
+
+auditory         Levene's W=858.62  p=2.015e-187
+gustatory        Levene's W=24.92  p=5.986e-07
+olfactory        Levene's W=472.64  p=2.146e-104
+haptic           Levene's W=2951.08  p=0
+visual           Levene's W=273.97  p=2.117e-61
+interoceptive    Levene's W=99.16  p=2.43e-23
+
+======================================================================
+END OF EFFECT SIZE CHECKS

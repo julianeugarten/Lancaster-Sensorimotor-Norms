@@ -1,7 +1,6 @@
 # %%
 import pandas as pd
 from pathlib import Path
-
 # msttr
 from lexical_diversity import lex_div as ld
 
@@ -17,7 +16,7 @@ OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
 
 # %%
 # get our data
-filename = "fanfics_mia_lemmatized.json"#simplestories
+filename = "storyscope_lemmatized.json" #"fanfics_mia_lemmatized.json"#simplestories
 path = DATA_PATH / filename
 data = pd.read_json(path)
 print(len(data))
@@ -98,7 +97,10 @@ for col in norms_cols:
 data.head()
 
 # %%
+filename = "testset" + filename
 savename = OUTPUT_PATH / filename.replace('.json', '_with_scores.json')
 # save the data with scores
 data.to_json(savename, orient='records', lines=True)
+# %%
+data.head()
 # %%

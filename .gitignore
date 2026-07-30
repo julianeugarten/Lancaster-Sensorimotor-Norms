@@ -1,4 +1,9 @@
-data/
+data/meta/
+data/lemmatized_data/
+data/data_subset_chr27.csv
 notebooks/OUT_DIR/minimalist_classification_dataset.csv.gz
 notebooks/OUT_DIR/full_classification_dataset.csv.gz
 notebooks/OUT_DIR/three_regime_classification_dataset.csv.gz
+notebooks/engagement_checks.py
+notebooks/results.md
+notebooks/test.ipynb

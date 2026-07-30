@@ -11,7 +11,8 @@ from math import pi
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import entropy, spearmanr
+from scipy.stats import entropy, spearmanr, levene
+
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy import stats
@@ -28,104 +29,16 @@ ts = time.strftime("%Y-%m-%d")
 print(f"Timestamp: {ts}")
 
 CWD = Path(__file__).parent
-DATA_PATH = CWD.parent / "data" / "lemmatized_data" / "scored_data"
+#DATA_PATH = CWD.parent / "data" / "lemmatized_data" / "scored_data"
+DATA_PATH = CWD.parent / "data" / "checkpoint"
 FIGS = CWD.parent / "figs"
 OUT_DIR = CWD / "OUT_DIR"
-CLEAN_DIR = OUT_DIR / "clean_data"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
-CLEAN_DIR.mkdir(parents=True, exist_ok=True)
 
-
-# %%
-
-datasets = {}
-
-for path in sorted(Path(DATA_PATH).glob("*.json")):
-    name = path.stem.replace("_with_scores", "").replace("_lemmatized", "")
-    datasets[name] = pd.read_json(path, orient='records', lines=True)
-    print(f"Loaded {name} dataset with {len(datasets[name])} entries.")
-
-datasets.keys()
-
-# %%
-
-### Build author labels ###
-
-datasets["simplestories"]["author"] = (datasets["simplestories"]["persona"] + "_" + datasets["simplestories"]["style"])
-
-datasets["storyscope"]["model"] = datasets["storyscope"]["work_id"].str.extract(r"_([a-zA-Z]+)$")
-datasets["storyscope"]["author"] = datasets["storyscope"]["model"] + "_" + datasets["storyscope"]["human_author"]
-
-print(datasets["storyscope"]["model"].value_counts(dropna=False))
-
-# %%
-### Also split storyscope into per-model datasets (combined "storyscope" stays too) ###
-
-for model, group in datasets["storyscope"].groupby("model"):
-    datasets[f"storyscope_{model}"] = group.drop(columns="model").reset_index(drop=True)
-
-storyscope_keys = [k for k in datasets if k.startswith("storyscope_")]
-print(storyscope_keys)
-
-datasets["storyscope"] = datasets["storyscope"].drop(columns="model")
-
-# sanity check
-for key in ["simplestories", "storyscope", *storyscope_keys]:
-    vc = datasets[key]["author"].value_counts()
-    print(f"\n{key} — authors with >10 stories:")
-    print(vc[vc > 10])
 
 
 # %%
 
-# Add chicago metadata
-
-# meta_chic
-meta = pd.read_excel(CWD.parent / "data" / "CHICAGO_MEASURES_MARCH24.xlsx")
-meta = meta[["BOOK_ID", "AUTH_FIRST", "AUTH_LAST", "WORDCOUNT", "PUBL_DATE", "LIBRARIES", "RATING_COUNT", ]]
-meta.columns = ["work_id", "author_first", "author_last", "text_length", "year", "libraries", "rating_count"]
-meta["author"] = meta["author_first"] + " " + meta["author_last"]
-meta.drop(columns=["author_first", "author_last"], inplace=True)
-chic = datasets["chicago"].merge(meta, how='left', on='work_id')
-# drop dups
-chic = chic.drop_duplicates(subset="work_id")
-# rename cols
-chic.rename(columns={col: "avg_matched_" + col.replace("_mean", ".mean") for col in chic.columns if col.endswith('_mean') and any(sense in col for sense in ['auditory', 'gustatory', 'haptic', 'interoceptive', 'olfactory', 'visual'])}, inplace=True)
-
-datasets["chicago"] = chic
-datasets.keys()
-
-# %%
-
-##### sense columns and derived metrics #####
-
-# decide which columns to use, here senses + normalized & engagement metrics
-sense_cols = ["auditory.mean", "gustatory.mean", "olfactory.mean", "haptic.mean", "visual.mean", "interoceptive.mean"]
-USE_WHAT = "avg_matched_" # set this to total, avg_matched, or normalized
-sense_cols_prefixed = [USE_WHAT + col for col in sense_cols]
-
-
-# for each dataset, we want to add entropy
-def add_entropy(df, sense_cols_prefixed):
-    df[f'{USE_WHAT}sense_sum'] = df[sense_cols_prefixed].sum(axis=1)
-    # add a column for the percent of each sense
-    for sense in sense_cols_prefixed:
-        colname = sense.replace('.mean', '_percent')
-        df[f"{colname}"] = df[sense] / df[f'{USE_WHAT}sense_sum']
-    # entropy of the sense distribution (we use the percent columns for this, since they sum to 1)
-    df['sense_entropy'] = df[[col for col in df.columns if col.endswith('_percent')]].apply(lambda x: entropy(x, base=2), axis=1)
-    return df
-
-# apply
-for name, df in datasets.items():
-    datasets[name] = add_entropy(df, sense_cols_prefixed)
-
-# define additional sense columns to use
-add_sense_cols = [f'{USE_WHAT}sense_sum', 'sense_entropy'] 
-percent_sense_cols = [col for col in df.columns if col.endswith('_percent')] # percent show some of the same info so we skip them for now
-
-
-# %%
 
 ### REMOVE 0 IF ACROSS ALL FEATS ####
 
@@ -138,66 +51,61 @@ for ds in list(datasets.keys()):
     print(f"After filtering: {len(datasets[ds])} (dropped {zero_mask.sum()})")
 
 
-# %%
-
-# save datasets
-datasets['chicago'].to_json(CWD.parent / "data" / f'{ts}_chicago.json', orient='records')
-datasets['fanfics'].to_json(CWD.parent / "data" / f'{ts}_fanfics.json', orient='records')
 
 # %%
 ### SUMMARY STATISTICS / DATASET ###
+def summarize_groups(groups_dict, sense_cols_prefixed, sense_cols, use_what):
+    """
+    groups_dict: dict of name -> dataframe (e.g. datasets, or fandom groups within fanfics)
+    Returns lines, the printable/log text ready to save to a txt file.
+    """
+    lines = []
+    def log(msg=""):
+        print(msg)
+        lines.append(str(msg))
 
-output_path = OUT_DIR / f"{ts}_sense_score_summary.txt"
-lines = []
+    for name, df in groups_dict.items():
+        log(f"Group: {name}")
+        log("-" * (len(name) + 7))
+        log(f"  N texts: {len(df)}")
+        log(f"  N unique authors: {df['author'].nunique()}")
 
-def log(msg=""):
-    print(msg)
-    lines.append(str(msg))
+        coverage_col = "perc_valid_scores_" + sense_cols[0].replace(use_what, "")
+        cov_mean, cov_sd = df[coverage_col].mean(), df[coverage_col].std()
+        log(f"  coverage        mean={cov_mean:.3f}  sd={cov_sd:.3f}")
 
-rows = []
+        for col, label in [("n_tokens", "n_tokens"),
+                            ("msttr_lemmas", "msttr_lemmas"),
+                            ("unique_vs_all_lemmas", "unique_vs_all")]:
+            if col in df.columns:
+                log(f"  {label:15s} mean={df[col].mean():.3f}  sd={df[col].std():.3f}")
 
-for name, df in datasets.items():
-    log(f"Dataset: {name}")
-    log("-" * (len(name) + 9))
-    log(f"  N texts: {len(df)}")
-    log(f"  N unique authors: {df['author'].nunique()}")
+        for sense in sense_cols_prefixed:
+            label = sense.replace(use_what, "").replace(".mean", "")
+            rho, pval = spearmanr(df[sense], df["sense_entropy"])
+            log(f"  {label:15s}  mean={df[sense].mean():.3f}  sd={df[sense].std():.3f}   "
+                f"entropy corr: rho={rho:+.3f} p={pval:.3g}")
 
-    coverage_col = "perc_valid_scores_" + sense_cols[0].replace(USE_WHAT, "")
-    cov_mean, cov_sd = df[coverage_col].mean(), df[coverage_col].std()
-    log(f"  coverage        mean={cov_mean:.3f}  sd={cov_sd:.3f}")
+        log(f"  {'sense_entropy':15s}  mean={df['sense_entropy'].mean():.3f}  sd={df['sense_entropy'].std():.3f}")
+        log("=" * 60)
 
-    for col, label in [("n_tokens", "n_tokens"),
-                        ("msttr_lemmas", "msttr_lemmas"),
-                        ("unique_vs_all_lemmas", "unique_vs_all")]:
-        if col in df.columns:
-            log(f"  {label:15s} mean={df[col].mean():.3f}  sd={df[col].std():.3f}")
+    return lines
 
-    for sense in sense_cols_prefixed:
-        label = sense.replace(USE_WHAT, "").replace(".mean", "")
-        rho, pval = spearmanr(df[sense], df["sense_entropy"])
-        log(f"  {label:15s}  mean={df[sense].mean():.3f}  sd={df[sense].std():.3f}   "
-            f"entropy corr: rho={rho:+.3f} p={pval:.3g}")
-        rows.append({
-            "dataset": name, "sense": label,
-            "score_mean": df[sense].mean(), "score_sd": df[sense].std(),
-            "coverage_mean": cov_mean, "coverage_sd": cov_sd,
-            "entropy_corr_rho": rho, "entropy_corr_p": pval,
-            "n_unique_authors": df["author"].nunique(),
-        })
-    log(f"  {'sense_entropy':15s}  mean={df['sense_entropy'].mean():.3f}  sd={df['sense_entropy'].std():.3f}")
-    log("=" * 60)
 
-output_path.write_text("\n".join(lines))
-print(f"\nSaved summary to {output_path}")
+def save_summary(lines, out_dir, ts, tag):
+    output_path = out_dir / f"{ts}_{tag}_summary.txt"
+    output_path.write_text("\n".join(lines))
+    print(f"\nSaved summary to {output_path}")
 
-summary_df = pd.DataFrame(rows)
-summary_df.to_csv(OUT_DIR / f"{ts}_sense_score_summary.csv", index=False)
-print(f"Saved tidy summary to {OUT_DIR / f'{ts}_sense_score_summary.csv'}")
 
-# %%
+# per-dataset summary (unchanged behavior)
+lines = summarize_groups(datasets, sense_cols_prefixed, sense_cols, USE_WHAT)
+save_summary(lines, OUT_DIR, ts, tag="sense_score")
 
-# save clean dataframe
-# summary_df.to_csv(CWD.parent / "data" / f"{ts}_cleaned_data.csv")
+# per-fandom summary (new)
+fandom_groups = {fandom: group for fandom, group in datasets["fanfics"].groupby("fandom_label")}
+fandom_lines = summarize_groups(fandom_groups, sense_cols_prefixed, sense_cols, USE_WHAT)
+save_summary(fandom_lines, OUT_DIR, ts, tag="fandom_sense_score")
 
 # %%
 
@@ -284,9 +192,6 @@ plt.show()
 
 ### CLASSIFICATION ###
 
-
-# %%
-
 # ============================================================
 # Build class groups
 # ============================================================
@@ -295,18 +200,25 @@ def build_class_groups(mode, datasets):
     storyscope_keys = [k for k in datasets if k.startswith("storyscope_")]
 
     if mode == "four_class":
-        storyscope_combined = pd.concat([datasets[k] for k in storyscope_keys], axis=0)
+        storyscope_combined = pd.concat([datasets[k].assign(model=k) for k in storyscope_keys], axis=0, ignore_index=True)
         return {"chicago": datasets["chicago"],
             "fanfics": datasets["fanfics"],
             "simplestories": datasets["simplestories"],
             "storyscope": storyscope_combined}
 
-    elif mode == "eight_class":
-        return {k: df for k, df in datasets.items() if k != "storyscope"}
-
     elif mode == "three_class":
-        # then we combine all the generated text as one
-        generated_combined = pd.concat([datasets["simplestories"], *[datasets[k] for k in storyscope_keys]], axis=0)
+        # tag each generated source before pooling, so we can stratify sampling across them
+        generated_pieces = []
+        simplestories_tagged = datasets["simplestories"].copy()
+        simplestories_tagged["source"] = "simplestories"
+        generated_pieces.append(simplestories_tagged)
+
+        for k in storyscope_keys:
+            piece = datasets[k].copy()
+            piece["source"] = k  # e.g. "storyscope_claude"
+            generated_pieces.append(piece)
+
+        generated_combined = pd.concat(generated_pieces, axis=0, ignore_index=True)
         return {"chicago": datasets["chicago"],
             "fanfics": datasets["fanfics"],
             "generated": generated_combined}
@@ -320,7 +232,57 @@ def build_class_groups(mode, datasets):
 # Assemble balanced dataset
 # ============================================================
 
-def build_balanced_dataset(class_groups, label_map, sense_cols, random_state, out_dir, ts, mode, extra_cols=None):
+# ============================================================
+# Assemble balanced dataset (now with optional stratified sampling)
+# ============================================================
+
+def stratified_sample(df, n, stratify_col, random_state):
+    """
+    Sample n rows from df, split as evenly as possible across the levels of
+    stratify_col (e.g. fandom, or model). Falls back to plain random sampling
+    if stratify_col is None or not present in df.
+    """
+    if stratify_col is None or stratify_col not in df.columns:
+        return df.sample(n=n, random_state=random_state)
+
+    levels = df[stratify_col].dropna().unique()
+    n_levels = len(levels)
+    if n_levels == 0:
+        return df.sample(n=n, random_state=random_state)
+
+    base_n = n // n_levels
+    remainder = n % n_levels  # distribute leftover rows across the first few levels
+
+    pieces = []
+    for i, level in enumerate(sorted(levels)):
+        sub = df[df[stratify_col] == level]
+        target = base_n + (1 if i < remainder else 0)
+        take = min(target, len(sub))
+        if take < target:
+            print(f"    WARNING: level '{level}' of '{stratify_col}' has only {len(sub)} rows, "
+                  f"wanted {target}")
+        pieces.append(sub.sample(n=take, random_state=random_state))
+
+    result = pd.concat(pieces, axis=0)
+    # if any level came up short, top up from the remaining pool (excluding what's already taken)
+    shortfall = n - len(result)
+    if shortfall > 0:
+        remaining_pool = df.drop(result.index)
+        top_up = remaining_pool.sample(n=min(shortfall, len(remaining_pool)), random_state=random_state)
+        result = pd.concat([result, top_up], axis=0)
+
+    return result
+
+
+def build_balanced_dataset(class_groups, label_map, sense_cols, random_state, out_dir, ts, mode,
+                            extra_cols=None, stratify_cols=None):
+    """
+    stratify_cols: optional dict mapping class name -> column name to stratify by
+                   when sampling that class (e.g. {"fanfics": "fandom_label",
+                   "storyscope": "model"}). Classes not in this dict are sampled
+                   with plain random sampling.
+    """
+    stratify_cols = stratify_cols or {}
     cols = sense_cols + ["label", "author", "n_tokens", "sense_entropy"] + (extra_cols or [])
     target_n = min(len(df) for df in class_groups.values())
     smallest = min(class_groups, key=lambda k: len(class_groups[k]))
@@ -333,7 +295,15 @@ def build_balanced_dataset(class_groups, label_map, sense_cols, random_state, ou
         n = min(target_n, len(d))
         if n < target_n:
             print(f"WARNING: {name} has only {len(d)} rows, less than target {target_n}")
-        pieces.append(d.sample(n=n, random_state=random_state)[cols])
+
+        stratify_col = stratify_cols.get(name)
+        if stratify_col:
+            print(f"  Sampling '{name}' stratified by '{stratify_col}'")
+            sampled = stratified_sample(d, n, stratify_col, random_state)
+        else:
+            sampled = d.sample(n=n, random_state=random_state)
+
+        pieces.append(sampled[cols])
 
     together = pd.concat(pieces, axis=0).sample(frac=1, random_state=random_state).reset_index(drop=True)
 
@@ -357,12 +327,11 @@ def build_balanced_dataset(class_groups, label_map, sense_cols, random_state, ou
     together["author"] = together["author"].astype("object")
 
     out_path = out_dir / f"{mode}_classification_dataset.csv.gz"
-    # exclude the raw text column from the saved CSV — keep the file lean, text can be re-derived
     save_cols = [c for c in together.columns if c != "lemmatized_text"]
     together[save_cols].drop(columns=["n_tokens"]).to_csv(out_path, index=False, compression="gzip")
     print(f"Saved balanced dataset to {out_path}")
 
-    return together  # keep n_tokens + lemmatized_text in memory for MFW step
+    return together
 
 # %%
 # ============================================================
@@ -564,7 +533,7 @@ random_state = 42
 #   "four_class"   -> chicago / fanfics / simplestories / storyscope (all models combined)
 #   "eight_class"         -> chicago / fanfics / simplestories / storyscope_gpt / storyscope_claude / ...
 #   "three_class" -> chicago / fanfics / generated (simplestories + all storyscope models pooled)
-MODE = "three_class"
+MODE = "four_class"
 
 class_groups = build_class_groups(MODE, datasets)
 class_names = sorted(class_groups.keys())
@@ -574,8 +543,9 @@ print("Label mapping:", label_map)
 
 together = build_balanced_dataset(
     class_groups, label_map, sense_cols_prefixed, random_state, OUT_DIR, ts, MODE,
-    extra_cols=["lemmatized_text"])
-
+    extra_cols=["lemmatized_text"],
+    stratify_cols={"fanfics": "fandom_label", "generated": "source", "storyscope": "model"})
+    
 results_raw = run_classification(together, sense_cols_prefixed, label_map, random_state=random_state)
 save_classification_outputs(results_raw, label_map, sense_cols_prefixed, MODE, ts, OUT_DIR, FIGS, USE_WHAT)
 
@@ -663,7 +633,7 @@ def plot_coefficients(results_raw, sense_cols, use_what, mode, ts, figs_dir):
         ax.scatter(means[~reliable], y_display[~reliable],
                    color="white", edgecolor="black", linewidth=1, s=80, zorder=2)
         ax.errorbar(means, y_display, xerr=stds,
-                    fmt="none", ecolor="black", elinewidth=.5, capsize=13, capthick=.5, zorder=1)
+                    fmt="none", ecolor="black", elinewidth=.5, capsize=15, capthick=.5, zorder=1)
 
         ax.axvline(0, color="0.1", linestyle="--", zorder=0.5)
         ax.set_title(name)
@@ -686,8 +656,9 @@ plot_coefficients(results_raw, sense_cols, USE_WHAT, MODE, ts, FIGS)
 
 # %%
 
-
+# ===========================================================
 # TESTING HOW WELL ENTROPY ALONE DOES
+# ===========================================================
 
 X_entropy = together[["sense_entropy"]]
 y = together["label"]
@@ -745,24 +716,44 @@ cm = confusion_matrix(all_y_true, all_y_pred, labels=class_labels)
 print("\nConfusion matrix:")
 print(cm)
 
-# %%
 
-##### ROBUSTNESS CHECK: LENGTH / COVERAGE / DIVERSITY CONFOUNDS #####
+
+
+
+# %%
+# ===========================================================
+# SHARED LOGGING HELPER
+# ===========================================================
+
+def make_logger():
+    """Returns (log, get_lines) — log() prints and buffers; get_lines() returns the buffer."""
+    lines = []
+    def log(msg=""):
+        print(msg)
+        lines.append(str(msg))
+    return log, lines
+
+
+def save_log(lines, out_dir, ts, tag):
+    output_path = out_dir / f"{ts}_{tag}.txt"
+    output_path.write_text("\n".join(lines))
+    print(f"\nSaved {tag} to {output_path}")
+
+
+# %%
+# ===========================================================
+# ROBUSTNESS CHECK: LENGTH / COVERAGE / DIVERSITY / PUBLICATION YEAR
+# ===========================================================
 
 coverage_col = "perc_valid_scores_visual.mean"
-
 robustness_datasets = {k: v for k, v in datasets.items() if k != "storyscope"}
 
-lines = []  # collect everything to write at the end
+log, lines = make_logger()
 
-def log(msg=""):
-    print(msg)
-    lines.append(str(msg))
-
-log("="*70)
-log("ROBUSTNESS CHECK: LENGTH, COVERAGE, AND LEXICAL DIVERSITY")
+log("=" * 70)
+log("ROBUSTNESS CHECK: LENGTH, COVERAGE, LEXICAL DIVERSITY, PUBLICATION YEAR")
 log(f"Generated: {ts}")
-log("="*70)
+log("=" * 70)
 
 # ------------------------------------------------------------------
 # 1. Within-Chicago: does token count predict visual score?
@@ -819,7 +810,6 @@ for name, df in robustness_datasets.items():
     log(f"\n{name}")
     log("-" * len(name))
 
-    # descriptive stats
     cov_mean, cov_sd = df[coverage_col].mean(), df[coverage_col].std()
     valid_msttr = df["msttr_lemmas"].notna()
     msttr_mean = df.loc[valid_msttr, "msttr_lemmas"].mean()
@@ -828,7 +818,6 @@ for name, df in robustness_datasets.items():
     log(f"  Coverage (perc_valid_scores_visual):  mean={cov_mean:.3f}  sd={cov_sd:.3f}  n={len(df)}")
     log(f"  MSTTR (lexical diversity):             mean={msttr_mean:.3f}  sd={msttr_sd:.3f}  n={valid_msttr.sum()} (of {len(df)})")
 
-    # correlations with visual score
     rho_cov, p_cov = stats.spearmanr(df[coverage_col], df["avg_matched_visual.mean"])
     rho_msttr, p_msttr = stats.spearmanr(
         df.loc[valid_msttr, "msttr_lemmas"], df.loc[valid_msttr, "avg_matched_visual.mean"]
@@ -837,14 +826,254 @@ for name, df in robustness_datasets.items():
     log(f"  MSTTR vs. visual score:     rho={rho_msttr:+.3f}  p={p_msttr:.4g}")
 
 # ------------------------------------------------------------------
-# Save everything to a single txt file
+# 5. Publication year (Chicago only): does era confound coverage or visual score?
 # ------------------------------------------------------------------
-log("\n" + "="*70)
+log("\n--- 5. Publication year (Chicago only): coverage/visual confound check ---\n")
+
+valid_year = chic_df["year"].notna()
+log(f"Year range: {chic_df['year'].min():.0f}--{chic_df['year'].max():.0f}")
+log(f"N with valid year: {valid_year.sum()} (of {len(chic_df)})")
+
+rho_cov_year, p_cov_year = stats.spearmanr(
+    chic_df.loc[valid_year, "year"], chic_df.loc[valid_year, coverage_col]
+)
+log(f"\nCoverage vs. year:     rho={rho_cov_year:+.3f}  p={p_cov_year:.4g}")
+
+rho_vis_year, p_vis_year = stats.spearmanr(
+    chic_df.loc[valid_year, "year"], chic_df.loc[valid_year, "avg_matched_visual.mean"]
+)
+log(f"Visual score vs. year: rho={rho_vis_year:+.3f}  p={p_vis_year:.4g}")
+
+model_year = smf.ols(
+    'Q("avg_matched_visual.mean") ~ year + Q("perc_valid_scores_visual.mean")',
+    data=chic_df.loc[valid_year]
+).fit()
+log(f"\nRegression: visual score ~ year + coverage")
+log(f"  year:     beta = {model_year.params['year']:+.4e}   p = {model_year.pvalues['year']:.4g}")
+log(f"  coverage: beta = {model_year.params['Q(\"perc_valid_scores_visual.mean\")']:+.4f}   "
+    f"p = {model_year.pvalues['Q(\"perc_valid_scores_visual.mean\")']:.4g}")
+log(f"  R-squared = {model_year.rsquared:.4f}, n = {int(model_year.nobs)}")
+
+log("\n" + "=" * 70)
 log("END OF ROBUSTNESS CHECK")
+save_log(lines, OUT_DIR, ts, tag="robustness_check")
 
-output_path = OUT_DIR / f"{ts}_robustness_check.txt"
-with open(output_path, "w") as f:
-    f.write("\n".join(lines))
 
-print(f"\nSaved full robustness check to {output_path}")
+# %%
+# ===========================================================
+# FANDOM COHERENCE CHECK (descriptive: means/SDs by fandom)
+# ===========================================================
+
+fanfics = datasets["fanfics"]
+print(fanfics["fandom_label"].value_counts())
+
+log, lines = make_logger()
+
+log("=" * 60)
+log("FANDOM-LEVEL SENSORY PROFILE COMPARISON (within Fanfiction)")
+log("=" * 60)
+
+for fandom, group in fanfics.groupby("fandom_label"):
+    log(f"\n{fandom} (n={len(group)})")
+    log("-" * (len(fandom) + 10))
+    for sense in sense_cols_prefixed:
+        label = sense.replace(USE_WHAT, "").replace(".mean", "")
+        log(f"  {label:15s}  mean={group[sense].mean():.3f}  sd={group[sense].std():.3f}")
+
+save_log(lines, OUT_DIR, ts, tag="fandom_coherence_summary")
+
+# visual check
+fig, axes = plt.subplots(2, 3, figsize=(14, 6))
+axes = axes.flatten()
+
+fandom_palette = sns.color_palette("husl", fanfics["fandom_label"].nunique())
+fandom_colors = dict(zip(sorted(fanfics["fandom_label"].unique()), fandom_palette))
+
+for i, sense in enumerate(senses):
+    ax = axes[i]
+    col = f'{USE_WHAT}{sense}.mean'
+    for fandom, group in fanfics.groupby("fandom_label"):
+        sns.kdeplot(data=group, x=col, label=fandom, color=fandom_colors[fandom], ax=ax, linewidth=1.5)
+    ax.set_xlabel(sense.capitalize())
+    ax.set_ylabel('Density' if i % 3 == 0 else '')
+
+axes[0].legend(loc='upper right', fontsize=8)
+plt.tight_layout()
+plt.savefig(FIGS / f"{ts}_fandom_kde.png", bbox_inches='tight')
+plt.show()
+
+
+# %%
+# ===========================================================
+# INTERNAL COHERENCE CHECK: Storyscope models & Fanfic fandoms
+# ===========================================================
+
+def check_internal_coherence(df, group_col, sense_cols, label, ts, out_dir, figs_dir,
+                              random_state=42, run_classifier=True):
+    log, lines = make_logger()
+
+    log("=" * 70)
+    log(f"INTERNAL COHERENCE CHECK: {label} (grouped by '{group_col}')")
+    log("=" * 70)
+    log(str(df[group_col].value_counts(dropna=False)))
+
+    log("\n--- Levene's test (variance homogeneity per sense) ---")
+    levene_results = {}
+    for sense in sense_cols:
+        s_label = sense.replace(USE_WHAT, "").replace(".mean", "")
+        groups = [g[sense].dropna().values for _, g in df.groupby(group_col)]
+        stat, p = levene(*groups)
+        log(f"{s_label:15s}  Levene's W={stat:.2f}  p={p:.4g}")
+        levene_results[s_label] = {"W": float(stat), "p": float(p)}
+
+    slug = label.lower().replace(" ", "_")
+    result = None
+
+    if run_classifier:
+        d = df.copy()
+        sub_label_map = {name: i for i, name in enumerate(sorted(d[group_col].dropna().unique()))}
+        d = d[d[group_col].notna()].copy()
+        d["label"] = d[group_col].map(sub_label_map)
+
+        missing_mask = d["author"].isna()
+        if missing_mask.any():
+            d.loc[missing_mask, "author"] = [f"missing_author_{i}" for i in range(missing_mask.sum())]
+            log(f"Filled {missing_mask.sum()} missing authors with dummy ids")
+        d["author"] = d["author"].astype("object")
+
+        target_n = d.groupby("label").size().min()
+        pieces = [group.sample(n=target_n, random_state=random_state) for _, group in d.groupby("label")]
+        d_balanced = pd.concat(pieces, axis=0).reset_index(drop=True)
+
+        result = run_classification(d_balanced, sense_cols, sub_label_map, random_state=random_state)
+
+        log(f"\n{label} internal separability:")
+        log(f"  accuracy = {np.mean(result['scores']['accuracy']):.4f} ± {np.std(result['scores']['accuracy']):.4f}")
+        log(f"  macro_f1 = {np.mean(result['scores']['macro_f1']):.4f} ± {np.std(result['scores']['macro_f1']):.4f}")
+        log(f"  roc_auc_ovr = {np.mean(result['scores']['roc_auc_ovr']):.4f} ± {np.std(result['scores']['roc_auc_ovr']):.4f}")
+
+        chance = 1 / len(sub_label_map)
+        log(f"  chance level (1/{len(sub_label_map)}) = {chance:.4f}")
+        log(f"  accuracy above chance = {np.mean(result['scores']['accuracy']) - chance:+.4f}")
+
+        log("\n--- Per-Class Performance (mean ± std) ---")
+        for c, name in zip(result["class_labels"], result["class_display_names"]):
+            log(f"\nClass {c} ({name}):")
+            for metric in ["precision", "recall", "f1"]:
+                key = f"{c}_{metric}"
+                vals = result["per_class_scores"][key]
+                log(f"  {metric}: {np.mean(vals):.4f} ± {np.std(vals):.4f}")
+
+        class_display_names = result["class_display_names"]
+        n_classes = len(class_display_names)
+        fig_size = max(3, n_classes * 0.9)
+        plt.figure(figsize=(fig_size, fig_size), dpi=500)
+        sns.heatmap(result["cm"], annot=True, fmt="d", cmap="Blues", cbar=False,
+                    xticklabels=class_display_names, yticklabels=class_display_names)
+        plt.xlabel(r"$\bf{Predicted}$")
+        plt.ylabel(r"$\bf{True}$")
+        plt.xticks(rotation=45, ha="right")
+        plt.yticks(rotation=0)
+        plt.tight_layout()
+        plt.savefig(figs_dir / f"{ts}_internal_coherence_{slug}_confusion_matrix.png")
+        plt.show()
+
+        json_out = {
+            "timestamp": ts,
+            "label": label,
+            "group_col": group_col,
+            "levene": levene_results,
+            "chance_level": chance,
+            "overall_metrics": {
+                m: {"mean": float(np.mean(result["scores"][m])), "std": float(np.std(result["scores"][m]))}
+                for m in ["accuracy", "macro_precision", "macro_recall", "macro_f1", "roc_auc_ovr"]
+            },
+            "per_class_metrics": {
+                name: {
+                    m: {
+                        "mean": float(np.mean(result["per_class_scores"][f"{c}_{m}"])),
+                        "std": float(np.std(result["per_class_scores"][f"{c}_{m}"])),
+                    }
+                    for m in ["precision", "recall", "f1"]
+                }
+                for c, name in zip(result["class_labels"], result["class_display_names"])
+            },
+            "confusion_matrix": result["cm"].tolist(),
+            "label_map": sub_label_map,
+        }
+        (out_dir / f"{ts}_internal_coherence_{slug}_results.json").write_text(json.dumps(json_out, indent=2))
+        log(f"Saved structured results to {ts}_internal_coherence_{slug}_results.json")
+
+    log("=" * 70)
+    save_log(lines, out_dir, ts, tag=f"internal_coherence_{slug}_summary")
+
+    return result
+
+
+storyscope_with_model = pd.concat(
+    [datasets[k].assign(model=k.replace("storyscope_", "")) for k in storyscope_keys],
+    axis=0, ignore_index=True,
+)
+
+storyscope_result = check_internal_coherence(
+    storyscope_with_model, group_col="model", sense_cols=sense_cols_prefixed, label="Storyscope models",
+    ts=ts, out_dir=OUT_DIR, figs_dir=FIGS,
+)
+
+fandom_result = check_internal_coherence(
+    datasets["fanfics"], group_col="fandom_label", sense_cols=sense_cols_prefixed, label="Fanfic fandoms",
+    ts=ts, out_dir=OUT_DIR, figs_dir=FIGS,
+)
+
+
+# %%
+# ===========================================================
+# EFFECT SIZES: BETWEEN-CORPUS DIFFERENCES (Cohen's d + Levene's)
+# ===========================================================
+
+def cohens_d(group1, group2):
+    n1, n2 = len(group1), len(group2)
+    m1, m2 = group1.mean(), group2.mean()
+    sd1, sd2 = group1.std(), group2.std()
+    pooled_sd = np.sqrt(((n1 - 1) * sd1**2 + (n2 - 1) * sd2**2) / (n1 + n2 - 2))
+    return (m1 - m2) / pooled_sd
+
+
+log, lines = make_logger()
+
+log("=" * 70)
+log("EFFECT SIZES: BETWEEN-CORPUS DIFFERENCES")
+log(f"Generated: {ts}")
+log("=" * 70)
+
+generated_pooled = pd.concat(
+    [datasets["simplestories"]] + [datasets[k] for k in storyscope_keys],
+    axis=0, ignore_index=True,
+)
+storyscope_combined_for_levene = pd.concat(
+    [datasets[k] for k in storyscope_keys], axis=0, ignore_index=True
+)
+
+comparisons = [
+    ("Chicago vs Fanfiction", datasets["chicago"], datasets["fanfics"]),
+    ("Chicago vs Generated (pooled)", datasets["chicago"], generated_pooled),
+    ("Fanfiction vs Generated (pooled)", datasets["fanfics"], generated_pooled),
+]
+
+for i, (title, g1, g2) in enumerate(comparisons, 1):
+    log(f"\n--- {i}. Cohen's d: {title}, per sense ---\n")
+    for sense in sense_cols_prefixed:
+        label = sense.replace(USE_WHAT, "").replace(".mean", "")
+        d = cohens_d(g1[sense], g2[sense])
+        log(f"{label:15s}  d={d:+.3f}")
+
+log(f"\n--- 4. Levene's test: Chicago vs Storyscope (combined), per sense ---\n")
+for sense in sense_cols_prefixed:
+    label = sense.replace(USE_WHAT, "").replace(".mean", "")
+    stat, p = levene(datasets["chicago"][sense], storyscope_combined_for_levene[sense])
+    log(f"{label:15s}  Levene's W={stat:.2f}  p={p:.4g}")
+
+log("\n" + "=" * 70)
+log("END OF EFFECT SIZE CHECKS")
+save_log(lines, OUT_DIR, ts, tag="effect_sizes")
 # %%

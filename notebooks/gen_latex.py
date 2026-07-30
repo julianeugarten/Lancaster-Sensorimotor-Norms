@@ -81,18 +81,6 @@ for mode, cap in [
         label=f"tab:perclass_{mode}",
     )
     print(tex, "\n\n")
-# %%
 
-for mode, cap in [
-    ("eight_class", "8-class classifier"),
-    ("eight_class_mfw6", "6-word MFW baseline"),
-    ("eight_class_mfw100", "100-word MFW baseline"),
-]:
-    tex = json_to_perclass_latex_rows(
-        OUT_DIR / f"{ts}_{mode}_classification_results.json",
-        caption=f"\\textbf{{Per-Class Performance}} across 5 folds (mean $\\pm$ std), {cap}.",
-        label=f"tab:perclass_{mode}",
-    )
-    print(tex, "\n\n")
 
 # %%
