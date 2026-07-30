@@ -1,6 +1,6 @@
 # raw source data too large/private to commit -- document how to obtain in README
 data/meta/CHICAGO_MEASURES_MARCH24.xlsx
-data/data_subset_chr27.csv
+data/fanfiction_set_m.csv
 
 # regeneratable intermediate artifacts
 data/lemmatized_data/
