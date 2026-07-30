@@ -1,10 +1,15 @@
-data/meta/
-data/lemmatized_data/
+# raw source data too large/private to commit -- document how to obtain in README
+data/meta/CHICAGO_MEASURES_MARCH24.xlsx
 data/data_subset_chr27.csv
-notebooks/OUT_DIR/minimalist_classification_dataset.csv.gz
-notebooks/OUT_DIR/full_classification_dataset.csv.gz
-notebooks/OUT_DIR/three_regime_classification_dataset.csv.gz
-notebooks/engagement_checks.py
-notebooks/results.md
-notebooks/test.ipynb
+
+# regeneratable intermediate artifacts
+data/lemmatized_data/
 data/checkpoint/text_local/
+notebooks/OUT_DIR/
+
+# scratch / personal working files
+notebooks/test.ipynb
+notebooks/results.md
+notebooks/engagement_checks.py
+julia_folder/
+resources/add_explicitness_prediction.py
