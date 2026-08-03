@@ -44,8 +44,8 @@ for path in sorted(Path(DATA_PATH).glob("*.json")):
 
 log(f"\nDatasets loaded: {sorted(datasets.keys())}")
 
-# %%
 
+# %%
 ### Give SimpleStories a work_id (it doesn't have one natively) ###
 
 if "work_id" not in datasets["simplestories"].columns:
@@ -134,12 +134,11 @@ for key in ["simplestories", "storyscope", *storyscope_keys]:
     log(f"\n{key}:")
     log(str(vc[vc > 10]))
 
+
 # %%
 ### Add Chicago metadata ###
 
 log(f"\n--- Adding Chicago metadata ---")
-
-datasets["chicago"] = datasets["chicago"].drop(columns=["text"])
 
 meta = pd.read_excel(CWD.parent / "data" / "meta" / "CHICAGO_MEASURES_MARCH24.xlsx")
 meta = meta[["BOOK_ID", "AUTH_FIRST", "AUTH_LAST", "WORDCOUNT", "PUBL_DATE"]]
