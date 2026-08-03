@@ -553,7 +553,7 @@ random_state = 42
 # Pick one grouping mode, or loop over all three further down.
 #   "four_class"   -> chicago / fanfics / simplestories / storyscope (all models combined)
 #   "three_class" -> chicago / fanfics / generated (simplestories + all storyscope models pooled)
-MODE = "three_class"
+MODE = "four_class"
 
 class_groups = build_class_groups(MODE, datasets)
 class_names = sorted(class_groups.keys())
@@ -677,6 +677,28 @@ def plot_coefficients(results_raw, sense_cols, use_what, mode, ts, figs_dir):
 
 plot_coefficients(results_raw, sense_cols, USE_WHAT, MODE, ts, FIGS)
 
+
+# %%
+# ===========================================================
+# SHARED LOGGING HELPER
+# ===========================================================
+
+def make_logger():
+    """Returns (log, get_lines) — log() prints and buffers; get_lines() returns the buffer."""
+    lines = []
+    def log(msg=""):
+        print(msg)
+        lines.append(str(msg))
+    return log, lines
+
+
+def save_log(lines, out_dir, ts, tag):
+    output_path = out_dir / f"{ts}_{tag}.txt"
+    output_path.write_text("\n".join(lines))
+    print(f"\nSaved {tag} to {output_path}")
+
+
+
 # %%
 
 # ===========================================================
@@ -699,8 +721,16 @@ cv = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
 
 per_class_scores = {f'{c}_{metric}': [] for c in class_labels for metric in ['precision', 'recall', 'f1']}
 scores_entropy = []
+macro_precision_scores, macro_recall_scores, macro_f1_scores = [], [], []
 roc_auc_scores = []
 all_y_true, all_y_pred = [], []
+
+log, lines = make_logger()  # reuse the shared logger from earlier in the pipeline
+
+log("=" * 70)
+log("ENTROPY-ONLY ABLATION")
+log(f"Generated: {ts}")
+log("=" * 70)
 
 for train_idx, test_idx in cv.split(X_entropy, y, groups):
     X_train, X_test = X_entropy.iloc[train_idx], X_entropy.iloc[test_idx]
@@ -723,45 +753,56 @@ for train_idx, test_idx in cv.split(X_entropy, y, groups):
         per_class_scores[f'{c}_recall'].append(report[key]['recall'])
         per_class_scores[f'{c}_f1'].append(report[key]['f1-score'])
 
+    macro_precision_scores.append(report['macro avg']['precision'])
+    macro_recall_scores.append(report['macro avg']['recall'])
+    macro_f1_scores.append(report['macro avg']['f1-score'])
+
     scores_entropy.append(model_entropy.score(X_test, y_test))
 
-print(f"Accuracy using entropy alone: {np.mean(scores_entropy):.4f} ± {np.std(scores_entropy):.4f}")
-print(f"ROC AUC (OvR): {np.mean(roc_auc_scores):.4f} ± {np.std(roc_auc_scores):.4f}\n")
+log(f"Accuracy using entropy alone: {np.mean(scores_entropy):.4f} ± {np.std(scores_entropy):.4f}")
+log(f"Macro F1: {np.mean(macro_f1_scores):.4f} ± {np.std(macro_f1_scores):.4f}")
+log(f"Macro Precision: {np.mean(macro_precision_scores):.4f} ± {np.std(macro_precision_scores):.4f}")
+log(f"Macro Recall: {np.mean(macro_recall_scores):.4f} ± {np.std(macro_recall_scores):.4f}")
+log(f"ROC AUC (OvR): {np.mean(roc_auc_scores):.4f} ± {np.std(roc_auc_scores):.4f}\n")
 
-print("--- Per-Class Performance (mean ± std) ---")
+log("--- Per-Class Performance (mean ± std) ---")
 for c, name in zip(class_labels, class_display_names):
-    print(f"\nClass {c} ({name}):")
+    log(f"\nClass {c} ({name}):")
     for metric in ['precision', 'recall', 'f1']:
         key = f'{c}_{metric}'
-        print(f"  {metric}: {np.mean(per_class_scores[key]):.4f} ± {np.std(per_class_scores[key]):.4f}")
+        log(f"  {metric}: {np.mean(per_class_scores[key]):.4f} ± {np.std(per_class_scores[key]):.4f}")
 
 cm = confusion_matrix(all_y_true, all_y_pred, labels=class_labels)
-print("\nConfusion matrix:")
-print(cm)
+log("\nConfusion matrix:")
+log(str(cm))
 
+save_log(lines, OUT_DIR, ts, tag=f"{MODE}_entropy_only_summary")
 
-
-
-
-# %%
-# ===========================================================
-# SHARED LOGGING HELPER
-# ===========================================================
-
-def make_logger():
-    """Returns (log, get_lines) — log() prints and buffers; get_lines() returns the buffer."""
-    lines = []
-    def log(msg=""):
-        print(msg)
-        lines.append(str(msg))
-    return log, lines
-
-
-def save_log(lines, out_dir, ts, tag):
-    output_path = out_dir / f"{ts}_{tag}.txt"
-    output_path.write_text("\n".join(lines))
-    print(f"\nSaved {tag} to {output_path}")
-
+# structured JSON, same shape as your main classification results
+entropy_results = {
+    "timestamp": ts,
+    "mode": MODE,
+    "n_classes": len(class_labels),
+    "class_labels": [int(c) for c in class_labels],
+    "class_display_names": class_display_names,
+    "overall_metrics": {
+        "accuracy": {"mean": float(np.mean(scores_entropy)), "std": float(np.std(scores_entropy))},
+        "macro_precision": {"mean": float(np.mean(macro_precision_scores)), "std": float(np.std(macro_precision_scores))},
+        "macro_recall": {"mean": float(np.mean(macro_recall_scores)), "std": float(np.std(macro_recall_scores))},
+        "macro_f1": {"mean": float(np.mean(macro_f1_scores)), "std": float(np.std(macro_f1_scores))},
+        "roc_auc_ovr": {"mean": float(np.mean(roc_auc_scores)), "std": float(np.std(roc_auc_scores))},
+    },
+    "per_class_metrics": {
+        name: {
+            m: {"mean": float(np.mean(per_class_scores[f'{c}_{m}'])), "std": float(np.std(per_class_scores[f'{c}_{m}']))}
+            for m in ['precision', 'recall', 'f1']
+        }
+        for c, name in zip(class_labels, class_display_names)
+    },
+    "confusion_matrix": cm.tolist(),
+}
+(OUT_DIR / f"{ts}_{MODE}_entropy_only_results.json").write_text(json.dumps(entropy_results, indent=2))
+log(f"Saved structured results to {ts}_{MODE}_entropy_only_results.json")
 
 # %%
 # ===========================================================
